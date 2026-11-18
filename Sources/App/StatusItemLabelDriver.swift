@@ -412,9 +412,7 @@ final class StatusItemLabelDriver {
         }
 
         var primary: [NSImage] = []
-        if let providerId = content.primaryProviderId {
-            primary.append(providerIcon(for: providerId, native: content.nativeMenuBarIconsEnabled, dark: content.isDarkAppearance))
-        }
+        // fork: no provider icon in the menu bar, the bars are the readout
 
         if let id = content.primaryProviderId, let name = content.accountNames[id] {
             primary.append(StatusBarPercentageImageRenderer.image(text: name, color: .primary))
@@ -444,7 +442,7 @@ final class StatusItemLabelDriver {
                     text: " | ", color: theme.menuBarStatusColor(for: label.status, darkMenuBar: content.isDarkAppearance)
                 ))
             }
-            var readout = [providerIcon(for: label.providerId, native: content.nativeMenuBarIconsEnabled, dark: content.isDarkAppearance)]
+            var readout: [NSImage] = [] // fork: no provider icon
             if let name = content.accountNames[label.providerId] {
                 readout.append(StatusBarPercentageImageRenderer.image(text: name, color: .primary))
             }
