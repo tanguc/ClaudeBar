@@ -133,7 +133,7 @@ struct ClaudeBarApp: App {
         let engine = Engine(
             settings: settingsRepository,
             vault: vault,
-            loginsInUse: DiskLoginsInUse(),
+            loginsInUse: nil, // fork: no account switching, the app only shows quotas
             loginShell: { shellEnvironment.value($0) },
             // The AWS SDK, linked by AWSClients alone, made once for a definition that reads the cloud.
             cloud: { (AWSClients.makeCloudWatch(), AWSClients.makePriceCatalog()) },
