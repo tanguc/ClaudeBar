@@ -35,6 +35,19 @@ public struct MenuBarLabel: Sendable, Equatable {
     /// `text` and `status` exactly, dual-window labels carry one per window.
     public let segments: [Segment]
 
+    /// fork: a bar per quota window for the bar meter, top first, `fraction` in 0...1
+    public struct Bar: Sendable, Equatable {
+        public let fraction: Double
+        public let status: QuotaStatus
+
+        public init(fraction: Double, status: QuotaStatus) {
+            self.fraction = fraction
+            self.status = status
+        }
+    }
+
+    public var bars: [Bar] = []
+
     /// `segments` defaults to a single segment mirroring `text`/`status`, so
     /// pre-existing call sites (and single-window labels) need no changes.
     public init(text: String, status: QuotaStatus, segments: [Segment]? = nil) {

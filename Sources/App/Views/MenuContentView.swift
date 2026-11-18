@@ -50,7 +50,8 @@ struct MenuContentView: View {
     @State private var pillsContentWidth: CGFloat = 0
     @State private var pillsViewportWidth: CGFloat = 0
     /// Logins hidden by the account chips — the page's filter, never a pause.
-    @State private var hiddenAccountIds: Set<String> = []
+    // fork: the account each product tab shows in detail, by tab id
+    @State private var focusedAccountIds: [String: String] = [:]
     /// The page under the pills: All, the Leaderboard, or the selected provider.
     @State private var page: PopoverPage = .provider
 
@@ -791,10 +792,9 @@ struct MenuContentView: View {
         }
     }
 
-    /// One product, its logins side by side: chips that hide one from this
-    /// view, their pool summed into one line, a section per unpaused login,
-    /// the ones paused under PAUSED with a Resume, and the login that makes
-    /// the product's status what it is, named.
+    /// One product, its logins as chips: the picked one is shown in detail (fork),
+    /// their pool summed into one line, the paused ones under PAUSED with a
+    /// Resume, and the login that makes the product's status what it is, named.
     private func accountsContent(_ tab: ProductTab) -> some View {
         VStack(spacing: 12) {
             if !tab.unpaused.isEmpty {
@@ -806,7 +806,7 @@ struct MenuContentView: View {
             if let state = newSessions.state(of: tab.provider) {
                 InUseStrip(state: state)
             }
-            ForEach(tab.unpaused.filter { !hiddenAccountIds.contains($0.id) }, id: \.id) { account in
+            if let account = focusedAccount(tab) {
                 providerSection(provider: account)
             }
             if tab.unpaused.isEmpty {
@@ -945,6 +945,11 @@ struct MenuContentView: View {
         .background(RoundedRectangle(cornerRadius: 10).fill(theme.glassBackground.opacity(0.4)))
     }
 
+    // fork: the chip picked last, or the first unpaused login
+    private func focusedAccount(_ tab: ProductTab) -> Account? {
+        tab.unpaused.first { $0.id == focusedAccountIds[tab.id] } ?? tab.unpaused.first
+    }
+
     private func accountChips(_ tab: ProductTab) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
@@ -952,10 +957,10 @@ struct MenuContentView: View {
                     .popoverFont(9, weight: .semibold)
                     .foregroundStyle(theme.textTertiary)
                 ForEach(tab.unpaused, id: \.id) { account in
-                    let hidden = hiddenAccountIds.contains(account.id)
+                    let hidden = focusedAccount(tab)?.id != account.id
                     HStack(spacing: 4) {
                         Button {
-                            if hidden { hiddenAccountIds.remove(account.id) } else { hiddenAccountIds.insert(account.id) }
+                            focusedAccountIds[tab.id] = account.id
                         } label: {
                             HStack(spacing: 4) {
                                 if tab.provider.inUse?.isInUse(account) == true { InUseBadge() }
@@ -967,7 +972,7 @@ struct MenuContentView: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .help(hidden ? "Show \(settings.shown(tab.provider.lineupName(of: account)))" : "Hide \(settings.shown(tab.provider.lineupName(of: account))) from this view")
+                        .help("Show \(settings.shown(tab.provider.lineupName(of: account)))")
                         // One click switches: the other logins end in "Use".
                         if tab.provider.inUse?.canBeInUse(account) == true, tab.provider.inUse?.isInUse(account) != true {
                             Button { newSessions.use(account) } label: {

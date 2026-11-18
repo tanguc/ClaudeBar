@@ -128,6 +128,7 @@ extension QuotaMonitor {
             ? segment(forQuotaKey: secondaryQuotaKey)
             : nil
 
+        func compose() -> MenuBarLabel? {
         switch (primary, secondary) {
         case let (.some(primary), .some(secondary)):
             func windowPrefix(forQuotaKey quotaKey: String) -> String {
@@ -161,6 +162,26 @@ extension QuotaMonitor {
             return MenuBarLabel(text: secondary.text, status: secondary.status)
         case (.none, .none):
             return nil
+        }
+        }
+        var label = compose()
+        label?.bars = menuBarBars(providerId: providerId, primaryQuotaKey: primaryQuotaKey,
+                                  secondaryQuotaKey: secondaryQuotaKey, mode: mode)
+        return label
+    }
+
+    // fork: the first window on top, then the configured second one or the next quota reported
+    func menuBarBars(providerId: String, primaryQuotaKey: String, secondaryQuotaKey: String,
+                     mode: UsageDisplayMode) -> [MenuBarLabel.Bar] {
+        let reported = lineup.first { $0.id == providerId }.flatMap { usage(of: $0) }?.quotas.map(\.quotaType.quotaKey) ?? []
+        let second = secondaryQuotaKey.isEmpty || secondaryQuotaKey == primaryQuotaKey
+            ? reported.first { $0 != primaryQuotaKey }
+            : secondaryQuotaKey
+        return ([primaryQuotaKey] + (second.map { [$0] } ?? [])).compactMap { key in
+            guard let quota = quota(providerId: providerId, quotaKey: key), let left = quota.percentLeft else { return nil }
+            let shown = mode == .used ? 100 - left : left
+            let status = menuBarPercentageDisplay(providerId: providerId, quotaKey: key, mode: mode)?.status ?? quota.status
+            return MenuBarLabel.Bar(fraction: min(max(shown / 100, 0), 1), status: status)
         }
     }
 }

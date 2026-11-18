@@ -468,6 +468,10 @@ final class StatusItemLabelDriver {
 
     private static func quotaImage(_ label: MenuBarLabel, stacked: Bool, size: MenuBarStackedSize,
                                    colonVisible: Bool, theme: any AppThemeProvider, dark: Bool) -> NSImage {
+        // fork: a bar meter as CodexBar draws it, the text stays in the tooltip
+        if !label.bars.isEmpty {
+            return barMeter(label.bars, theme: theme, dark: dark)
+        }
         if stacked, label.segments.count == 2 {
             return StatusBarStackedImageRenderer.image(
                 top: (label.segments[0].text, theme.menuBarStatusColor(for: label.segments[0].status, darkMenuBar: dark)),
@@ -487,6 +491,30 @@ final class StatusItemLabelDriver {
         return StatusBarPercentageImageRenderer.image(
             text: label.text, color: theme.menuBarStatusColor(for: label.status, darkMenuBar: dark), colonVisible: colonVisible
         )
+    }
+
+    // fork: one thin rounded bar per window, top first, filled in its status colour
+    static func barMeter(_ bars: [MenuBarLabel.Bar], theme: any AppThemeProvider, dark: Bool) -> NSImage {
+        let width: CGFloat = 28, height: CGFloat = 16, gap: CGFloat = 3
+        let barHeight: CGFloat = bars.count > 1 ? 4.5 : 5
+        let total = CGFloat(bars.count) * barHeight + CGFloat(bars.count - 1) * gap
+        let track = dark ? NSColor.white.withAlphaComponent(0.28) : NSColor.black.withAlphaComponent(0.22)
+        let fills = bars.map { ($0.fraction, NSColor(theme.menuBarStatusColor(for: $0.status, darkMenuBar: dark))) }
+        return NSImage(size: NSSize(width: width, height: height), flipped: true) { _ in
+            var y = (height - total) / 2
+            for (fraction, color) in fills {
+                let rect = NSRect(x: 0, y: y, width: width, height: barHeight)
+                track.setFill()
+                NSBezierPath(roundedRect: rect, xRadius: barHeight / 2, yRadius: barHeight / 2).fill()
+                if fraction > 0 {
+                    let fill = NSRect(x: 0, y: y, width: max(barHeight, width * fraction), height: barHeight)
+                    color.setFill()
+                    NSBezierPath(roundedRect: fill, xRadius: barHeight / 2, yRadius: barHeight / 2).fill()
+                }
+                y += barHeight + gap
+            }
+            return true
+        }
     }
 
     /// Template assets contain only the mark, never the colored tile. Custom or
