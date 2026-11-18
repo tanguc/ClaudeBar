@@ -52,7 +52,7 @@ final class AppLeaderboard {
 
     /// The key store and the machine are the Mac's, from the factory.
     init(monitor: QuotaMonitor,
-         api: any LeaderboardAPI = Leaderboard.makeAPI(client: AppLeaderboard.client),
+         api: any LeaderboardAPI = OfflineLeaderboardAPI(),
          keys: any SigningKeyStore = Leaderboard.makeKeyStore(),
          machine: any MachineIdentity = Leaderboard.makeMachineIdentity(),
          settings: any LeaderboardSettingsRepository = JSONSettingsRepository.shared) {
@@ -65,12 +65,17 @@ final class AppLeaderboard {
         let sevenDays = Board(period: .sevenDays, api: api, membership: membership)
         board = sevenDays
         boards = [sevenDays]
+        // fork: the tab stays hidden and nothing uploads
+        membership.turnOff()
     }
 
     /// Uploads once soon after launch, then asks every five minutes and on
     /// wake; the uploader decides whether the hour has passed. A `Timer`'s
     /// clock stops while the Mac sleeps, so it can't keep the hour itself.
-    func start() {
+    // fork: no upload timer
+    func start() {}
+
+    private func upstreamStart() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.uploader.uploadDue() }

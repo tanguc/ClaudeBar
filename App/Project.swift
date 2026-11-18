@@ -92,7 +92,6 @@ let project = Project(
                 .external(name: "Leaderboard"),
                 .external(name: "AWSClients"),
                 .target(name: "Infrastructure"),
-                .external(name: "Sparkle"),
                 .external(name: "MenuBarExtraAccess"),
                 .external(name: "Matrix"),
             ],
@@ -106,16 +105,14 @@ let project = Project(
                     "PRODUCT_BUNDLE_IDENTIFIER": "com.tddworks.claudebar",
                 ],
                 debug: [
-                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG ENABLE_SPARKLE",
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG",
                     // A dev or test copy must never share the installed app's
                     // bundle ID: Sparkle's installer watches only the first
                     // running app with it, so a running debug build can break
                     // the installed app's update handshake (issue #450).
                     "PRODUCT_BUNDLE_IDENTIFIER": "com.tddworks.claudebar.debug",
                 ],
-                release: [
-                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "ENABLE_SPARKLE",
-                ]
+                release: [:]
             )
         ),
 
