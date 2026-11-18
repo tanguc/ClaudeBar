@@ -220,8 +220,6 @@ final class StatusItemLabelDriver {
     }
 
     private func currentLabelContent() -> LabelContent {
-        // fork: the bar meter is always the readout, whatever the percentage setting says
-        let showPercentage = true
         let primaryQuotaKey = settings.menuBarPercentageQuotaKey.isEmpty
             ? (monitor.login(id: settings.menuBarPercentageProviderId).flatMap { monitor.usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "session")
             : settings.menuBarPercentageQuotaKey
@@ -229,14 +227,14 @@ final class StatusItemLabelDriver {
             providerId: settings.menuBarPercentageProviderId,
             primaryQuotaKey: primaryQuotaKey,
             secondaryQuotaKey: settings.menuBarSecondaryQuotaKey,
-            showPercentage: showPercentage,
+            showPercentage: settings.menuBarPercentageEnabled,
             showDuration: settings.menuBarDurationEnabled,
             mode: settings.usageDisplayMode
         )
 
         let selection = [settings.menuBarPercentageProviderId,
                          settings.menuBarPercentageQuotaKey, settings.menuBarSecondaryQuotaKey,
-                         String(showPercentage), String(settings.menuBarDurationEnabled),
+                         String(settings.menuBarPercentageEnabled), String(settings.menuBarDurationEnabled),
                          settings.usageDisplayMode.rawValue]
         let label = freshLabel ?? (lastLabelSelection == selection
             ? lastKnownLabel(whenFreshIsMissing: freshLabel) : nil)
@@ -244,14 +242,14 @@ final class StatusItemLabelDriver {
         let additionalLabels = monitor.additionalMenuBarLabels(
             providerIds: settings.menuBarAdditionalProviderIds,
             configurations: settings.menuBarProviderSettings,
-            showPercentage: showPercentage,
+            showPercentage: settings.menuBarPercentageEnabled,
             showDuration: settings.menuBarDurationEnabled,
             mode: settings.usageDisplayMode
         )
         let hasCountdownColon = ([label].compactMap { $0 } + additionalLabels.map(\.label))
             .contains { !CountdownColon.ranges(in: $0.text).isEmpty }
         let primaryProvider = monitor.lineup.first { $0.id == settings.menuBarPercentageProviderId }
-        let showsQuota = showPercentage || settings.menuBarDurationEnabled
+        let showsQuota = settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled
         let shownIds = [settings.menuBarPercentageProviderId] + additionalLabels.map(\.providerId)
         let accountNames = MenuBarAccountName.names(Dictionary(uniqueKeysWithValues: Set(shownIds).compactMap { id in
             monitor.login(id: id)
@@ -495,23 +493,23 @@ final class StatusItemLabelDriver {
         )
     }
 
-    // fork: one thin rounded bar per window, top first, filled in its status colour
+    // fork: thin monochrome bars, one per window, top first, as CodexBar draws them
     static func barMeter(_ bars: [MenuBarLabel.Bar], theme: any AppThemeProvider, dark: Bool) -> NSImage {
-        let width: CGFloat = 28, height: CGFloat = 16, gap: CGFloat = 3
-        let barHeight: CGFloat = bars.count > 1 ? 4.5 : 5
+        let width: CGFloat = 24, height: CGFloat = 16, barHeight: CGFloat = 3.5, gap: CGFloat = 2.5
         let total = CGFloat(bars.count) * barHeight + CGFloat(bars.count - 1) * gap
-        let track = dark ? NSColor.white.withAlphaComponent(0.28) : NSColor.black.withAlphaComponent(0.22)
-        let fills = bars.map { ($0.fraction, NSColor(theme.menuBarStatusColor(for: $0.status, darkMenuBar: dark))) }
+        let ink = dark ? NSColor.white : NSColor.black
+        let track = ink.withAlphaComponent(0.25)
+        let fractions = bars.map(\.fraction)
         return NSImage(size: NSSize(width: width, height: height), flipped: true) { _ in
             var y = (height - total) / 2
-            for (fraction, color) in fills {
-                let rect = NSRect(x: 0, y: y, width: width, height: barHeight)
+            for fraction in fractions {
+                let radius = barHeight / 2
                 track.setFill()
-                NSBezierPath(roundedRect: rect, xRadius: barHeight / 2, yRadius: barHeight / 2).fill()
+                NSBezierPath(roundedRect: NSRect(x: 0, y: y, width: width, height: barHeight), xRadius: radius, yRadius: radius).fill()
                 if fraction > 0 {
-                    let fill = NSRect(x: 0, y: y, width: max(barHeight, width * fraction), height: barHeight)
-                    color.setFill()
-                    NSBezierPath(roundedRect: fill, xRadius: barHeight / 2, yRadius: barHeight / 2).fill()
+                    ink.setFill()
+                    NSBezierPath(roundedRect: NSRect(x: 0, y: y, width: max(barHeight, width * fraction), height: barHeight),
+                                 xRadius: radius, yRadius: radius).fill()
                 }
                 y += barHeight + gap
             }

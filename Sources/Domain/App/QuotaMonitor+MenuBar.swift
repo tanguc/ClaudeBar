@@ -165,20 +165,30 @@ extension QuotaMonitor {
         }
         }
         var label = compose()
-        label?.bars = menuBarBars(providerId: providerId, primaryQuotaKey: primaryQuotaKey,
-                                  secondaryQuotaKey: secondaryQuotaKey, mode: mode)
+        let bars = menuBarBars(providerId: providerId, primaryQuotaKey: primaryQuotaKey,
+                               secondaryQuotaKey: secondaryQuotaKey, mode: mode)
+        // fork: bars still show when the configured text window is missing
+        if label == nil, let worst = bars.map(\.status).max() {
+            label = MenuBarLabel(text: "", status: worst)
+        }
+        label?.bars = bars
         return label
     }
 
-    // fork: the first window on top, then the configured second one or the next quota reported
+    // fork: session on top and weekly below unless the menu bar settings pick other windows;
+    // a session window the provider omits (claude does while it is unused) reads as full
     func menuBarBars(providerId: String, primaryQuotaKey: String, secondaryQuotaKey: String,
                      mode: UsageDisplayMode) -> [MenuBarLabel.Bar] {
         let reported = lineup.first { $0.id == providerId }.flatMap { usage(of: $0) }?.quotas.map(\.quotaType.quotaKey) ?? []
-        let second = secondaryQuotaKey.isEmpty || secondaryQuotaKey == primaryQuotaKey
-            ? reported.first { $0 != primaryQuotaKey }
-            : secondaryQuotaKey
-        return ([primaryQuotaKey] + (second.map { [$0] } ?? [])).compactMap { key in
-            guard let quota = quota(providerId: providerId, quotaKey: key), let left = quota.percentLeft else { return nil }
+        let configured = !secondaryQuotaKey.isEmpty && secondaryQuotaKey != primaryQuotaKey
+        let keys = configured ? [primaryQuotaKey, secondaryQuotaKey]
+            : reported.contains("weekly") ? ["session", "weekly"]
+            : Array(reported.prefix(2))
+        return keys.compactMap { key in
+            guard let quota = quota(providerId: providerId, quotaKey: key), let left = quota.percentLeft else {
+                return key == "session" && reported.contains("weekly")
+                    ? MenuBarLabel.Bar(fraction: mode == .used ? 0 : 1, status: .healthy) : nil
+            }
             let shown = mode == .used ? 100 - left : left
             let status = menuBarPercentageDisplay(providerId: providerId, quotaKey: key, mode: mode)?.status ?? quota.status
             return MenuBarLabel.Bar(fraction: min(max(shown / 100, 0), 1), status: status)
