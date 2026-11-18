@@ -220,6 +220,8 @@ final class StatusItemLabelDriver {
     }
 
     private func currentLabelContent() -> LabelContent {
+        // fork: the bar meter is always the readout, whatever the percentage setting says
+        let showPercentage = true
         let primaryQuotaKey = settings.menuBarPercentageQuotaKey.isEmpty
             ? (monitor.login(id: settings.menuBarPercentageProviderId).flatMap { monitor.usage(of: $0) }?.quotas.first?.quotaType.quotaKey ?? "session")
             : settings.menuBarPercentageQuotaKey
@@ -227,14 +229,14 @@ final class StatusItemLabelDriver {
             providerId: settings.menuBarPercentageProviderId,
             primaryQuotaKey: primaryQuotaKey,
             secondaryQuotaKey: settings.menuBarSecondaryQuotaKey,
-            showPercentage: settings.menuBarPercentageEnabled,
+            showPercentage: showPercentage,
             showDuration: settings.menuBarDurationEnabled,
             mode: settings.usageDisplayMode
         )
 
         let selection = [settings.menuBarPercentageProviderId,
                          settings.menuBarPercentageQuotaKey, settings.menuBarSecondaryQuotaKey,
-                         String(settings.menuBarPercentageEnabled), String(settings.menuBarDurationEnabled),
+                         String(showPercentage), String(settings.menuBarDurationEnabled),
                          settings.usageDisplayMode.rawValue]
         let label = freshLabel ?? (lastLabelSelection == selection
             ? lastKnownLabel(whenFreshIsMissing: freshLabel) : nil)
@@ -242,14 +244,14 @@ final class StatusItemLabelDriver {
         let additionalLabels = monitor.additionalMenuBarLabels(
             providerIds: settings.menuBarAdditionalProviderIds,
             configurations: settings.menuBarProviderSettings,
-            showPercentage: settings.menuBarPercentageEnabled,
+            showPercentage: showPercentage,
             showDuration: settings.menuBarDurationEnabled,
             mode: settings.usageDisplayMode
         )
         let hasCountdownColon = ([label].compactMap { $0 } + additionalLabels.map(\.label))
             .contains { !CountdownColon.ranges(in: $0.text).isEmpty }
         let primaryProvider = monitor.lineup.first { $0.id == settings.menuBarPercentageProviderId }
-        let showsQuota = settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled
+        let showsQuota = showPercentage || settings.menuBarDurationEnabled
         let shownIds = [settings.menuBarPercentageProviderId] + additionalLabels.map(\.providerId)
         let accountNames = MenuBarAccountName.names(Dictionary(uniqueKeysWithValues: Set(shownIds).compactMap { id in
             monitor.login(id: id)
