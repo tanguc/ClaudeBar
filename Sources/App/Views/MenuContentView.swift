@@ -1829,10 +1829,10 @@ struct TwoColumnCardGrid<Item, ID: Hashable, Cell: View>: View {
             ForEach(rows, id: \.id) { row in
                 HStack(spacing: spacing) {
                     cell(row.leading)
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     if let trailing = row.trailing {
                         cell(trailing)
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     } else {
                         // Hold the empty slot so a lone final card keeps
                         // column width instead of stretching across the row.
@@ -1842,6 +1842,8 @@ struct TwoColumnCardGrid<Item, ID: Hashable, Cell: View>: View {
                             .accessibilityHidden(true)
                     }
                 }
+                // fork: the row is as tall as its tallest card, both cards fill it
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -2027,6 +2029,8 @@ struct WrappedStatCard: View {
             }
         }
         .padding(12)
+        // fork: fill the row so side-by-side cards share top and bottom
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: theme.cardCornerRadius)
