@@ -950,62 +950,62 @@ struct MenuContentView: View {
         tab.unpaused.first { $0.id == focusedAccountIds[tab.id] } ?? tab.unpaused.first
     }
 
+    // fork: one full-width row per login, stacked, instead of a scrolling chip row
     private func accountChips(_ tab: ProductTab) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                Text("ACCOUNTS")
-                    .popoverFont(9, weight: .semibold)
-                    .foregroundStyle(theme.textTertiary)
-                ForEach(tab.unpaused, id: \.id) { account in
-                    let hidden = focusedAccount(tab)?.id != account.id
-                    HStack(spacing: 4) {
-                        Button {
-                            focusedAccountIds[tab.id] = account.id
-                        } label: {
-                            HStack(spacing: 4) {
-                                if tab.provider.inUse?.isInUse(account) == true { InUseBadge() }
-                                Text(settings.shown(tab.provider.lineupName(of: account))).lineLimit(1)
-                                Circle()
-                                    .fill(account.lastError != nil ? theme.textTertiary
-                                          : theme.statusColor(for: monitor.status(of: account) ?? .healthy))
-                                    .frame(width: 6, height: 6)
-                            }
+        VStack(alignment: .leading, spacing: 6) {
+            Text("ACCOUNTS")
+                .popoverFont(9, weight: .semibold)
+                .foregroundStyle(theme.textTertiary)
+            ForEach(tab.unpaused, id: \.id) { account in
+                let hidden = focusedAccount(tab)?.id != account.id
+                HStack(spacing: 4) {
+                    Button {
+                        focusedAccountIds[tab.id] = account.id
+                    } label: {
+                        HStack(spacing: 8) {
+                            if tab.provider.inUse?.isInUse(account) == true { InUseBadge() }
+                            Circle()
+                                .fill(account.lastError != nil ? theme.textTertiary
+                                      : theme.statusColor(for: monitor.status(of: account) ?? .healthy))
+                                .frame(width: 7, height: 7)
+                            Text(settings.shown(tab.provider.lineupName(of: account)))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show \(settings.shown(tab.provider.lineupName(of: account)))")
+                    // One click switches: the other logins end in "Use".
+                    if tab.provider.inUse?.canBeInUse(account) == true, tab.provider.inUse?.isInUse(account) != true {
+                        Button { newSessions.use(account) } label: {
+                            Text("Use")
+                                .popoverFont(10, weight: .bold)
+                                .foregroundStyle(theme.accentPrimary)
                         }
                         .buttonStyle(.plain)
-                        .help("Show \(settings.shown(tab.provider.lineupName(of: account)))")
-                        // One click switches: the other logins end in "Use".
-                        if tab.provider.inUse?.canBeInUse(account) == true, tab.provider.inUse?.isInUse(account) != true {
-                            Button { newSessions.use(account) } label: {
-                                Text("Use")
-                                    .popoverFont(10, weight: .bold)
-                                    .foregroundStyle(theme.accentPrimary)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
-                            .accessibilityLabel("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
-                        }
+                        .help("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
+                        .accessibilityLabel("Use \(settings.shown(tab.provider.lineupName(of: account))) for new terminal sessions")
                     }
-                    .popoverFont(11, weight: .medium)
-                    // The provider pills' shape and height. A leading IN USE badge sits
-                    // concentric: the same gap on its left as above and below it.
-                    .frame(height: InUseBadge.chipHeight(in: theme))
-                    .padding(.leading, tab.provider.inUse?.isInUse(account) == true ? InUseBadge.gap(in: theme) : 10)
-                    .padding(.trailing, 10)
-                    .background(RoundedRectangle(cornerRadius: theme.pillCornerRadius).fill(hidden ? Color.clear : theme.glassBackground))
-                    // Stroked across the edge, as the provider pills and the cards are:
-                    // its anti-aliasing falls evenly on both sides, so the bottom edge
-                    // is as heavy as the top. (strokeBorder lost the bottom's half pixel.)
-                    .overlay(RoundedRectangle(cornerRadius: theme.pillCornerRadius).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
-                    .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
-                    .contextMenu { accountMenuFor(account) }
                 }
+                .popoverFont(11, weight: .medium)
+                // The provider pills' height. A leading IN USE badge sits
+                // concentric: the same gap on its left as above and below it.
+                .frame(height: InUseBadge.chipHeight(in: theme))
+                .padding(.leading, tab.provider.inUse?.isInUse(account) == true ? InUseBadge.gap(in: theme) : 10)
+                .padding(.trailing, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: theme.pillCornerRadius).fill(hidden ? Color.clear : theme.glassBackground))
+                // Stroked across the edge, as the provider pills and the cards are:
+                // its anti-aliasing falls evenly on both sides, so the bottom edge
+                // is as heavy as the top. (strokeBorder lost the bottom's half pixel.)
+                .overlay(RoundedRectangle(cornerRadius: theme.pillCornerRadius).stroke(theme.glassBorder, lineWidth: theme.cardBorderWidth))
+                .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)
+                .contextMenu { accountMenuFor(account) }
             }
-            // As the provider pills: a scroll view clips at its edges, so leave
-            // room for an outlined theme's thick outline.
-            .padding(.vertical, theme.isOutlined ? 5 : 1)
-            .padding(.leading, theme.isOutlined ? 2 : 1)
-            .padding(.trailing, theme.isOutlined ? 5 : 1)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// "240% left across 3 logins" — the pool's sum, in `PoolText`'s words;
