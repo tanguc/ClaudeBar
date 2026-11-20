@@ -866,7 +866,7 @@ struct MenuContentView: View {
     private func pausedRow(_ account: Account) -> some View {
         HStack(spacing: 8) {
             Text(String(account.displayName.prefix(1)).uppercased())
-                .font(.system(size: 8, weight: .bold))
+                .font(theme.font(size: popoverTextSize.readable(8), weight: .bold))
                 .foregroundStyle(theme.textTertiary)
                 .frame(width: 18, height: 18)
                 .background(Circle().fill(theme.glassBackground))
@@ -1855,6 +1855,7 @@ struct WrappedStatCard: View {
     var showsReset: Bool = true
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.popoverTextSize) private var popoverTextSize
     @State private var isHovering = false
     @State private var animateProgress = false
     @State private var settings = AppSettings.shared
@@ -1941,7 +1942,7 @@ struct WrappedStatCard: View {
                         )
                         .layoutPriority(1)
                         Text(headline.caption)
-                            .font(theme.font(size: 9, weight: .heavy))
+                            .font(theme.font(size: popoverTextSize.readable(9), weight: .heavy))
                             .foregroundStyle(theme.textTertiary)
                     }
                     .lineLimit(1)
@@ -1971,7 +1972,7 @@ struct WrappedStatCard: View {
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor : theme.textPrimary)
 
                         Text("%")
-                            .font(theme.font(size: 13, weight: .medium))
+                            .font(theme.font(size: popoverTextSize.readable(13), weight: .medium))
                             .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.7) : theme.textTertiary)
                     }
                 }
@@ -1980,7 +1981,7 @@ struct WrappedStatCard: View {
 
                 if !theme.isOutlined {
                     Text(valueCaption)
-                        .font(theme.font(size: isCappedSpend ? 10 : 12, weight: .medium))
+                        .font(theme.font(size: popoverTextSize.readable(isCappedSpend ? 10 : 12), weight: .medium))
                         .fixedSize()
                         .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.8) : theme.textTertiary)
                 }
@@ -2060,12 +2061,12 @@ struct WrappedStatCard: View {
     private func resetLine(_ line: QuotaCardText.ResetLine) -> Text {
         let time = line.time.map {
             Text($0)
-                .font(theme.font(size: 8.5, weight: .heavy))
+                .font(theme.font(size: popoverTextSize.readable(8.5), weight: .heavy))
                 .foregroundColor(theme.textPrimary)
         }
         guard !line.lead.isEmpty else { return time ?? Text("") }
         let lead = Text(line.lead)
-            .font(theme.font(size: 8.5, weight: .semibold))
+            .font(theme.font(size: popoverTextSize.readable(8.5), weight: .semibold))
             .foregroundColor(theme.textTertiary)
         guard let time else { return lead }
         return lead + Text(" ") + time
@@ -2082,19 +2083,21 @@ struct WrappedStatCard: View {
     }
 
     /// The forecast sentence under the reset line — "Runs out in 38m — 34m
-    /// before it resets". Muted, one row, and it carries *at this pace* as its
+    /// before it resets". Muted, up to two rows, and it carries *at this pace* as its
     /// tooltip: the number is the window's average, never a promise.
     private func forecastLine(_ text: String) -> some View {
-        HStack(spacing: 3) {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
             Image(systemName: "hourglass")
                 .popoverFont(7)
                 .foregroundStyle(theme.textTertiary)
 
-            Text(text)
-                .font(theme.font(size: 8, weight: .medium))
+            // fork: an explicit break where the dash was, so each half stays whole
+            Text(text.replacingOccurrences(of: " — ", with: "\n"))
+                .font(theme.font(size: popoverTextSize.readable(8), weight: .medium))
                 .foregroundStyle(theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .lineLimit(1)
+        .lineLimit(2)
         .help(QuotaCardText.forecastQualifier)
     }
 
@@ -2126,6 +2129,7 @@ struct WrappedStatCard: View {
 
 struct LoadingSpinnerView: View {
     @Environment(\.appTheme) private var theme
+    @Environment(\.popoverTextSize) private var popoverTextSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -2150,7 +2154,7 @@ struct LoadingSpinnerView: View {
                 }
 
                 Text("Fetching usage data...")
-                    .font(theme.font(size: 13, weight: .medium))
+                    .font(theme.font(size: popoverTextSize.readable(13), weight: .medium))
                     .foregroundStyle(theme.textSecondary)
             }
             .frame(height: 140)
@@ -2170,6 +2174,7 @@ struct WrappedActionButton: View {
     let action: () -> Void
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.popoverTextSize) private var popoverTextSize
     @State private var isHovering = false
 
     var body: some View {
@@ -2186,7 +2191,7 @@ struct WrappedActionButton: View {
                 }
 
                 Text(label)
-                    .font(theme.font(size: 12, weight: theme.isOutlined ? .bold : .medium))
+                    .font(theme.font(size: popoverTextSize.readable(12), weight: theme.isOutlined ? .bold : .medium))
                     .fixedSize()
             }
             .foregroundStyle(isHovering && !theme.isOutlined ? .white : theme.textPrimary)

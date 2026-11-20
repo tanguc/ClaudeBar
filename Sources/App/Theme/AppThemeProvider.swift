@@ -83,6 +83,11 @@ public protocol AppThemeProvider {
     /// Font design (default, rounded, monospaced, serif)
     var fontDesign: Font.Design { get }
 
+    /// Font design for big numbers when the theme has no display font.
+    /// fork: lets a theme keep a terminal face for numerals while its words
+    /// read in a text face.
+    var numberFontDesign: Font.Design { get }
+
     /// Custom font family name (e.g., "IBM Plex Mono"). When set, views use this instead of system font.
     var customFontName: String? { get }
 
@@ -233,6 +238,7 @@ public extension AppThemeProvider {
     /// A printed, outlined theme (Pop): opaque paper instead of glass, ink
     /// outlines, inked selections and switches.
     var isOutlined: Bool { cardBorderWidth > 1 }
+    var numberFontDesign: Font.Design { fontDesign }
     var displayFontName: String? { nil }
     var displayFontScale: CGFloat { 1 }
     var textOnStatus: Color { .white }
@@ -263,7 +269,7 @@ public extension AppThemeProvider {
     /// system font at `weight` in `fontDesign`.
     func displayFont(size: CGFloat, weight: Font.Weight = .bold) -> Font {
         if let displayFontName { return .custom(displayFontName, size: size * displayFontScale) }
-        return .system(size: size, weight: weight, design: fontDesign)
+        return .system(size: size, weight: weight, design: numberFontDesign)
     }
 
     /// Default status color mapping
@@ -350,7 +356,7 @@ public extension AppThemeProvider {
             }
             return .custom("\(name)\(suffix)", size: size)
         }
-        return .system(size: size, weight: weight, design: fontDesign)
+        return .system(size: size, weight: weight, design: fontDesign).monospacedDigit()
     }
 }
 

@@ -22,6 +22,12 @@ extension PopoverTextSize {
         size * textScale
     }
 
+    /// The point size a designed `size` renders at: lifted onto the reading
+    /// ramp first, then scaled by this text size.
+    func readable(_ size: CGFloat) -> CGFloat {
+        scaled(PopoverReadingRamp.lift(size))
+    }
+
     /// The width the popover draws at: text and window in step, so a line that
     /// fits at one size still fits at the next.
     ///
@@ -29,6 +35,22 @@ extension PopoverTextSize {
     /// never size the window for a different size than the one it draws in.
     var popoverWidth: CGFloat {
         PopoverContentWidth.width(scale: textScale)
+    }
+}
+
+// MARK: - Reading Ramp
+
+/// fork: the popover's designed sizes run down to 7pt, which is unreadable on
+/// a menu bar popover. The ramp squeezes 7-13pt into 11-14pt so nothing reads
+/// below 11pt, keeps the order between sizes, and leaves large numbers alone
+/// apart from a 1pt lift so the hierarchy stays continuous.
+enum PopoverReadingRamp {
+    /// Smallest size any popover text renders at, before the text size scale.
+    static let floor: CGFloat = 11
+
+    static func lift(_ size: CGFloat) -> CGFloat {
+        if size >= 13 { return size + 1 }
+        return max(floor, floor + (size - 7) / 2)
     }
 }
 
@@ -73,7 +95,7 @@ struct PopoverFontModifier: ViewModifier {
     /// this to `Font.system`, so the rendered size and the asserted size cannot
     /// drift apart.
     func pointSize(at textSize: PopoverTextSize) -> CGFloat {
-        textSize.scaled(size)
+        textSize.readable(size)
     }
 
     func body(content: Content) -> some View {

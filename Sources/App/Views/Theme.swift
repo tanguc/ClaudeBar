@@ -563,6 +563,7 @@ extension View {
 struct BadgeStyle: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.appTheme) private var theme
+    @Environment(\.popoverTextSize) private var popoverTextSize
     let color: Color
 
     /// An outlined theme draws badges as solid outlined chips, as round as
@@ -575,7 +576,7 @@ struct BadgeStyle: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .font(theme.badgeFont(size: 8))
+            .font(theme.badgeFont(size: popoverTextSize.readable(7)))
             .foregroundStyle(theme.textOnStatus)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

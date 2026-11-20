@@ -42,6 +42,7 @@ struct StatusColorOverridingTheme: AppThemeProvider {
     var textSecondary: Color { base.textSecondary }
     var textTertiary: Color { base.textTertiary }
     var fontDesign: Font.Design { base.fontDesign }
+    var numberFontDesign: Font.Design { base.numberFontDesign }
     var customFontName: String? { base.customFontName }
     var displayFontName: String? { base.displayFontName }
     var displayFontScale: CGFloat { base.displayFontScale }

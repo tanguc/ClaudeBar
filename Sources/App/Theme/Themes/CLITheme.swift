@@ -24,13 +24,14 @@ public struct CLITheme: AppThemeProvider {
     static let black = Color(red: 0.0, green: 0.0, blue: 0.0)
     static let charcoal = Color(red: 0.08, green: 0.08, blue: 0.08)
     static let darkGray = Color(red: 0.15, green: 0.15, blue: 0.15)
-    static let gray = Color(red: 0.45, green: 0.45, blue: 0.45)
+    // fork: lighter greys, the originals sat too close to the black ground
+    static let gray = Color(red: 0.62, green: 0.62, blue: 0.62)
     static let green = Color(red: 0.0, green: 0.85, blue: 0.35)
     static let greenDim = Color(red: 0.0, green: 0.55, blue: 0.22)
     static let amber = Color(red: 0.95, green: 0.75, blue: 0.2)
     static let red = Color(red: 0.95, green: 0.25, blue: 0.25)
     static let white = Color(red: 0.92, green: 0.92, blue: 0.92)
-    static let whiteDim = Color(red: 0.65, green: 0.65, blue: 0.65)
+    static let whiteDim = Color(red: 0.80, green: 0.80, blue: 0.80)
 
     // MARK: - Background
 
@@ -71,7 +72,9 @@ public struct CLITheme: AppThemeProvider {
     public var textPrimary: Color { Self.white }
     public var textSecondary: Color { Self.whiteDim }
     public var textTertiary: Color { Self.gray }
-    public var fontDesign: Font.Design { .monospaced }
+    // fork: words in the text face, numbers keep the terminal face
+    public var fontDesign: Font.Design { .default }
+    public var numberFontDesign: Font.Design { .monospaced }
 
     // MARK: - Status Colors
 

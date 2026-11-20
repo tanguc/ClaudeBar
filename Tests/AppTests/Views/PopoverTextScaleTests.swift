@@ -103,31 +103,39 @@ struct PopoverTextScaleTests {
     // MARK: - The Font The Modifier Actually Resolves
 
     @Test
-    func `the modifier resolves 8pt at Default`() {
-        // `body` hands `pointSize(at:)` straight to `Font.system`, so this is
-        // the size the popover's 8pt card labels are drawn at when nobody has
-        // chosen a text size.
+    func `the modifier lifts the 8pt card label onto the reading ramp at Default`() {
+        // fork: 8pt was unreadable even at Default, so the ramp lifts it to
+        // 11.5pt before the text size scale applies.
         let modifier = PopoverFontModifier(size: 8, weight: .medium, design: .default)
-        #expect(isClose(modifier.pointSize(at: .medium), 8))
+        #expect(isClose(modifier.pointSize(at: .medium), 11.5))
     }
 
     @Test
-    func `the modifier resolves the 8pt card label to 11.2pt at Extra Large`() {
-        // The reporter's own example (#364): the SESSION / WEEKLY label was 8pt
-        // and unreadable. This is the size that fixes it.
+    func `the modifier scales the lifted card label with the text size`() {
         let modifier = PopoverFontModifier(size: 8, weight: .medium, design: .default)
-        #expect(isClose(modifier.pointSize(at: .extraLarge), 11.2))
-        #expect(isClose(modifier.pointSize(at: .large), 9.6))
+        #expect(isClose(modifier.pointSize(at: .large), 11.5 * 1.2))
+        #expect(isClose(modifier.pointSize(at: .extraLarge), 11.5 * 1.4))
     }
 
     @Test
-    func `the modifier passes the requested size through unscaled at Default`() {
-        // Every size the popover names, so a wrong default cannot quietly move
-        // the whole popover.
-        let sizes: [CGFloat] = [7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 26, 28, 36]
+    func `no popover text renders below the reading floor`() {
+        let sizes: [CGFloat] = [7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 12]
         for size in sizes {
-            #expect(isClose(PopoverFontModifier(size: size, weight: nil, design: nil).pointSize(at: .medium), size))
+            #expect(PopoverFontModifier(size: size, weight: nil, design: nil).pointSize(at: .medium) >= 11)
         }
+    }
+
+    @Test
+    func `the ramp keeps the order between designed sizes`() {
+        let sizes: [CGFloat] = [7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 26, 28, 36]
+        let lifted = sizes.map(PopoverReadingRamp.lift)
+        #expect(zip(lifted, lifted.dropFirst()).allSatisfy { $0 < $1 })
+    }
+
+    @Test
+    func `large sizes only move by a point`() {
+        #expect(isClose(PopoverReadingRamp.lift(13), 14))
+        #expect(isClose(PopoverReadingRamp.lift(28), 29))
     }
 
     // MARK: - What The Popover Actually Draws

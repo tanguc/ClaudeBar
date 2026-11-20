@@ -181,6 +181,7 @@ public struct SystemTheme: AppThemeProvider {
     public var textSecondary: Color { delegate.textSecondary }
     public var textTertiary: Color { delegate.textTertiary }
     public var fontDesign: Font.Design { delegate.fontDesign }
+    public var numberFontDesign: Font.Design { delegate.numberFontDesign }
     public var statusHealthy: Color { delegate.statusHealthy }
     public var statusWarning: Color { delegate.statusWarning }
     public var statusCritical: Color { delegate.statusCritical }

@@ -1,3 +1,4 @@
+#if ENABLE_SPARKLE
 import Foundation
 import Testing
 @testable import ClaudeBar
@@ -41,3 +42,4 @@ struct SparkleUpdaterFailureTests {
         #expect(SparkleUpdater.isUpdateFailure(error))
     }
 }
+#endif
