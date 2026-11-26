@@ -135,6 +135,21 @@
       "id": "authEnvVar",
       "label": "Environment variable",
       "default": "COPILOT_TOKEN"
+    },
+    {
+      "id": "tokenFile",
+      "label": "Token File (JSON with a GitHub OAuth token, newest match)",
+      "for": [
+        "copilotAPI"
+      ]
+    },
+    {
+      "id": "tokenFileField",
+      "label": "Token Field in the File",
+      "default": "$.refresh_token",
+      "for": [
+        "copilotAPI"
+      ]
     }
   ],
   "defaultDataSource": "billing",
@@ -206,6 +221,12 @@
           },
           {
             "setting": "token"
+          },
+          {
+            "jsonFile": {
+              "path": "{{setting.tokenFile}}",
+              "token": "{{setting.tokenFileField}}"
+            }
           },
           {
             "keychain": {

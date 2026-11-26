@@ -5,7 +5,15 @@ function read(response) {
     const premium = json.quota_snapshots && json.quota_snapshots.premium_interactions;
     // Unlimited, or no AI-credits quota at all: the plan, and no made-up 100% (the Left law).
     const account = typeof json.login === 'string' && json.login ? {email: json.login} : undefined;
-    if (!premium || premium.unlimited === true) return {quotas: [], plan, account};
+    if (!premium) return {quotas: [], plan, account};
+    if (premium.unlimited === true) {
+        // An uncapped seat (business, billed per token) still counts what was spent: a note, no bar.
+        const used = Number(premium.credits_used);
+        if (!Number.isFinite(used) || used <= 0) return {quotas: [], plan, account};
+        const reset = resetDay(json.quota_reset_date_utc || json.quota_reset_date);
+        const text = String(Math.round(used)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' AI credits used, no cap' + (reset ? ', resets ' + reset : '');
+        return {quotas: [], notes: [{group: 'Monthly', label: 'AI credits', text}], plan, account};
+    }
 
     const entitlement = Number(premium.entitlement) || 0;
     const remaining = Number(premium.remaining) || 0;
@@ -24,4 +32,13 @@ function read(response) {
         quota.windowSeconds = (reset - start) / 1000;
     }
     return {quotas: [quota], plan, account};
+}
+
+// "2026-12-01" -> "1 Dec", in UTC like GitHub's reset date
+function resetDay(text) {
+    const at = Date.parse(text || '');
+    if (!Number.isFinite(at)) return null;
+    const day = new Date(at);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return day.getUTCDate() + ' ' + months[day.getUTCMonth()];
 }

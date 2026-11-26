@@ -24,7 +24,7 @@ struct CopilotDefinitionTests {
 
     /// Copilot with its old card's settings where it kept them.
     private func make(mode: String? = nil, body: String? = nil, status: Int = 200, username: String? = "octocat",
-                      plan: String? = nil, manual: String? = nil, envVar: String? = nil,
+                      plan: String? = nil, manual: String? = nil, envVar: String? = nil, tokenFile: String? = nil,
                       vault: MemoryVault = MemoryVault(["copilot.token": "saved"]), environment: [String: String] = [:],
                       ghLogin: String? = nil, refuse: Set<String> = [], seen: Seen = Seen()) throws -> Provider {
         let network = MockNetworkClient()
@@ -44,6 +44,7 @@ struct CopilotDefinitionTests {
         settings.setValue(plan, "plan", forProvider: "copilot")
         settings.setValue(manual, "manualUsage", forProvider: "copilot")
         settings.setValue(envVar, "authEnvVar", forProvider: "copilot")
+        settings.setValue(tokenFile, "tokenFile", forProvider: "copilot")
         let definition = try ProviderFactory.builtIn("copilot")
         return Provider(definition: definition, settings: settings, accounts: settings.accounts(forProvider: "copilot"), makeDataSource: { source, login in
             DataSources.make(source, providerId: definition.id, cliExecutor: MockCLIExecutor(), network: network,
@@ -195,6 +196,24 @@ struct CopilotDefinitionTests {
         let account = product.defaultAccount
         let snapshot = try await product.refresh(account)
         #expect(snapshot.quotas.isEmpty)
+    }
+
+    @Test func `should count an uncapped seat's AI credits as a note, with no bar`() async throws {
+        let body = #"{"copilot_plan":"business","quota_reset_date_utc":"2026-12-01T00:00:00.000Z","quota_snapshots":{"premium_interactions":{"unlimited":true,"credits_used":6326}}}"#
+        let snapshot = try await make(mode: "copilotAPI", body: body).refreshPlain()
+        #expect(snapshot.quotas.isEmpty)
+        #expect(snapshot.extensionMetrics?.map(\.value) == ["6,326 AI credits used, no cap, resets 1 Dec"])
+    }
+
+    @Test func `should read the Copilot API with the token in the newest file the token file setting matches`() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try #"{"access_token":"tid=short","refresh_token":"ghu_proxy"}"#
+            .write(to: folder.appendingPathComponent("copilot-1.json"), atomically: true, encoding: .utf8)
+        let seen = Seen()
+        _ = try await make(mode: "copilotAPI", tokenFile: folder.path + "/copilot-*.json", vault: MemoryVault(), seen: seen).refreshPlain()
+        #expect(seen.authorization == "Bearer ghu_proxy")
     }
 
     @Test func `should read the Copilot API with the GitHub CLI's login when no token is saved`() async throws {
