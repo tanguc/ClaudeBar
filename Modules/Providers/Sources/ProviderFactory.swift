@@ -90,11 +90,10 @@ public enum ProviderFactory {
             },
             guestPasses: guestPasses,
             // The definition says how to read each login's logs; the default
-            // login reads them where the vendor keeps them on this Mac.
-            // Records an added login claims by model suffix are its own, not the default's.
-            usageHistory: usageHistory ?? definition.usageHistory(forDefaultAccount: definition.defaultAccountValues)
-                .map { $0.droppingModels(endingWith: accounts.compactMap {
-                    $0.probeConfig[ProviderDefinition.Accounts.usageModelSuffixValue] }.filter { !$0.isEmpty }) }
+            // login reads them where the vendor keeps them on this Mac, with
+            // its own saved settings (a gateway account names its records).
+            usageHistory: usageHistory ?? definition.usageHistory(forDefaultAccount: definition.defaultAccountValues(
+                saved: { settings.value($0, forProvider: definition.id) }))
                 .map { history($0, login: definition.id, environment: environment) },
             makeUsageHistory: { history($0, login: $1, environment: environment) },
             loginsInUse: loginsInUse,

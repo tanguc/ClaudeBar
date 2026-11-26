@@ -264,30 +264,24 @@
   ],
   "usageHistory": {
     "records": {
-      "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
+      "files": "${LLM_ARCHIVE_USAGE:-~/.local/share/llm-archive/usage}/*.jsonl",
       "format": "jsonLines",
       "where": {
-        "path": "$.type",
-        "equals": "assistant"
+        "path": "$.auth_ref",
+        "equals": "{{account.gatewayAuth#sha256.64}}"
       },
-      "at": "$.timestamp",
+      "at": "$.at",
       "id": [
-        "$.message.id",
-        "$.requestId"
+        "$.id"
       ],
-      "model": "$.message.model",
-      "project": "$.cwd",
+      "model": "$.model",
       "tokens": {
-        "input": "$.message.usage.input_tokens",
-        "output": "$.message.usage.output_tokens",
-        "cacheWrite": "$.message.usage.cache_creation_input_tokens",
-        "cacheWrite1h": "$.message.usage.cache_creation.ephemeral_1h_input_tokens",
-        "cacheRead": "$.message.usage.cache_read_input_tokens"
+        "input": "$.tokens.input",
+        "output": "$.tokens.output",
+        "cacheWrite": "$.tokens.cache_write",
+        "cacheRead": "$.tokens.cache_read"
       }
     },
-    "sessionGap": 1800,
-    "models": {
-      "startingWith": "copilot/"
-    }
+    "sessionGap": 1800
   }
 }

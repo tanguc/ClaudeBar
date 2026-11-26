@@ -68,45 +68,6 @@ struct UsageLogTests {
         #expect(days[0].totalTokens == 3000)
     }
 
-    @Test func `should count only a login's own records when its model suffix marks them`() async throws {
-        try write([line(model: "m-medium-2", id: "a", at: stamp()),
-                   line(model: "m-medium-2-other", id: "b", input: 2000, output: 1000, at: stamp())])
-        let own = await log(Self.definition.keepingModels(endingWith: "-other")).days(last: 1)[0]
-        let rest = await log(Self.definition.droppingModels(endingWith: ["-other"])).days(last: 1)[0]
-        #expect(own.totalTokens == 3000)
-        #expect(rest.totalTokens == 1500)
-    }
-
-    @Test func `should count only a gateway's sessions when the definition names their model prefix`() async throws {
-        try write([line(model: "m-medium-2", id: "a", at: stamp()),
-                   line(model: "gw/m-medium-2", id: "b", input: 2000, output: 1000, at: stamp())])
-        let base = Self.definition
-        let gateway = UsageLog.Definition(records: base.records, prices: base.prices, sessionGap: base.sessionGap,
-                                          models: UsageLog.ModelFilter(startingWith: "gw/"))
-        let rest = UsageLog.Definition(records: base.records, prices: base.prices, sessionGap: base.sessionGap,
-                                       models: UsageLog.ModelFilter(notStartingWith: ["gw/"]))
-        #expect(await log(gateway).days(last: 1)[0].totalTokens == 3000)
-        #expect(await log(rest).days(last: 1)[0].totalTokens == 1500)
-    }
-
-    @Test func `should keep a definition's own model rule when a login's suffix is added`() {
-        let base = UsageLog.Definition(records: Self.definition.records,
-                                       models: UsageLog.ModelFilter(notStartingWith: ["gw/"]))
-        let own = base.keepingModels(endingWith: "-other").models
-        let rest = base.droppingModels(endingWith: ["-other"]).models
-        #expect(own?.keeps("m-2-other") == true)
-        #expect(own?.keeps("gw/m-2-other") == false)
-        #expect(rest?.keeps("m-2") == true)
-        #expect(rest?.keeps("m-2-other") == false)
-        #expect(rest?.keeps("gw/m-2") == false)
-    }
-
-    @Test func `should read another login's logs apart, so its days are summed again`() {
-        let plain = log().fingerprint
-        #expect(log(Self.definition.keepingModels(endingWith: "-other")).fingerprint != plain)
-        #expect(log(Self.definition.droppingModels(endingWith: [])).fingerprint == plain)
-    }
-
     @Test func `should show every day empty when nothing is logged`() async {
         #expect(await log().days(last: 2).allSatisfy(\.isEmpty))
     }

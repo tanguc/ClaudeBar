@@ -105,7 +105,7 @@ struct CodexUsageHistoryTests {
 
     @Test func `should show no cost for Codex's history, since its logs name no model`() throws {
         #expect(try !history().knowsCost)
-        let claude = try #require(try ProviderFactory.builtIn("claude").defaultAccountHistory)
+        let claude = try #require(try ProviderFactory.builtIn("claude").defaultAccountHistory(gatewayAuth: "claude-westep.json"))
         #expect(UsageHistory(log: DataSources.makeUsageLog(claude, scripts: ProviderFactory.builtInScripts,
                                                            environment: { _ in nil }, homeDirectory: home)).knowsCost)
     }

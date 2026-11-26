@@ -11,4 +11,9 @@ extension ProviderDefinition {
     var defaultAccountHistory: UsageLog.Definition? {
         usageHistory(forDefaultAccount: defaultAccountValues)
     }
+
+    /// The plain login's history with its gateway account set, as the person saves it.
+    func defaultAccountHistory(gatewayAuth: String) -> UsageLog.Definition? {
+        usageHistory(forDefaultAccount: defaultAccountValues.merging(["gatewayAuth": gatewayAuth]) { _, set in set })
+    }
 }

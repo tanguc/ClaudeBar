@@ -45,9 +45,8 @@ public struct UsageLog: Sendable {
         if let scan = await reader.scan {
             AppLog.probes.info("Usage history: scanned the log's recent files (\(scan.reused) unchanged, \(scan.extended) appended, \(scan.reparsed) read in full)")
         }
-        let mine = definition.models.map { filter in raw.filter { filter.keeps($0.model) } } ?? raw
-        let records = LogRecord.deduplicated(mine)
-        AppLog.probes.info("Usage history: \(raw.count) raw records, \(mine.count) this login's, \(records.count) after dedup")
+        let records = LogRecord.deduplicated(raw)
+        AppLog.probes.info("Usage history: \(raw.count) raw records, \(records.count) after dedup")
 
         // `freeWhen` describes the route now, so it prices only the day that
         // holds now: an earlier day keeps its estimate.
@@ -80,69 +79,14 @@ extension UsageLog {
         /// count — each read on its own, never added to these records. An
         /// added login's patch sets it to `null`: the apps belong to the Mac.
         public let otherApps: [OtherApp]?
-        /// Which records are this login's when several logins write one log,
-        /// told apart by the model id a gateway gave each (fork).
-        public let models: ModelFilter?
 
         public init(records: Records, prices: Prices? = nil, freeWhen: FreeWhen? = nil, sessionGap: Double? = nil,
-                    otherApps: [OtherApp]? = nil, models: ModelFilter? = nil) {
+                    otherApps: [OtherApp]? = nil) {
             self.records = records
             self.prices = prices
             self.freeWhen = freeWhen
             self.sessionGap = sessionGap
             self.otherApps = otherApps
-            self.models = models
-        }
-
-        /// The same log read for one login of several: only the records
-        /// whose model id ends with `suffix`, and none of the Mac's other apps.
-        public func keepingModels(endingWith suffix: String) -> Definition {
-            Definition(records: records, prices: prices, freeWhen: freeWhen, sessionGap: sessionGap,
-                       otherApps: nil, models: (models ?? ModelFilter()).with(endingWith: suffix))
-        }
-
-        /// The same log without the records other logins' model suffixes mark.
-        public func droppingModels(endingWith suffixes: [String]) -> Definition {
-            guard !suffixes.isEmpty else { return self }
-            return Definition(records: records, prices: prices, freeWhen: freeWhen, sessionGap: sessionGap,
-                              otherApps: otherApps, models: (models ?? ModelFilter()).with(notEndingWith: suffixes.sorted()))
-        }
-    }
-
-    /// Which model ids are this log's: `endingWith` / `startingWith` keep a
-    /// record only when its model matches, `notEndingWith` / `notStartingWith`
-    /// drop one that does. A record with no model is kept unless a keep rule
-    /// asks for one. `{ "startingWith": "copilot/" }` in a definition reads
-    /// one gateway's sessions out of a shared log.
-    public struct ModelFilter: Sendable, Equatable, Codable {
-        public let endingWith: String?
-        public let notEndingWith: [String]?
-        public let startingWith: String?
-        public let notStartingWith: [String]?
-
-        public init(endingWith: String? = nil, notEndingWith: [String]? = nil,
-                    startingWith: String? = nil, notStartingWith: [String]? = nil) {
-            self.endingWith = endingWith
-            self.notEndingWith = notEndingWith
-            self.startingWith = startingWith
-            self.notStartingWith = notStartingWith
-        }
-
-        func with(endingWith suffix: String) -> ModelFilter {
-            ModelFilter(endingWith: suffix, notEndingWith: notEndingWith, startingWith: startingWith, notStartingWith: notStartingWith)
-        }
-
-        func with(notEndingWith suffixes: [String]) -> ModelFilter {
-            ModelFilter(endingWith: endingWith, notEndingWith: suffixes, startingWith: startingWith, notStartingWith: notStartingWith)
-        }
-
-        public func keeps(_ model: String?) -> Bool {
-            let wanted = [endingWith, startingWith].contains { !($0 ?? "").isEmpty }
-            guard let model else { return !wanted }
-            if let endingWith, !endingWith.isEmpty, !model.hasSuffix(endingWith) { return false }
-            if let startingWith, !startingWith.isEmpty, !model.hasPrefix(startingWith) { return false }
-            if (notEndingWith ?? []).contains(where: { !$0.isEmpty && model.hasSuffix($0) }) { return false }
-            return !(notStartingWith ?? []).contains { !$0.isEmpty && model.hasPrefix($0) }
         }
     }
 
@@ -547,8 +491,7 @@ extension DataSources {
         }
         let records = UsageLog.Records(source: source, shapes: definition.records.shapes)
         let own = UsageLog.Definition(records: records, prices: definition.prices,
-                                      freeWhen: definition.freeWhen, sessionGap: definition.sessionGap,
-                                      models: definition.models)
+                                      freeWhen: definition.freeWhen, sessionGap: definition.sessionGap)
         hash.update(data: (try? encoder.encode(own)) ?? Data())
         if case .files(let files, _) = definition.records.source {
             hash.update(data: Data(expand(files).utf8))

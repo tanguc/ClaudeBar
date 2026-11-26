@@ -161,11 +161,12 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         /// signed in to it.
         public static let folderValue = "folder"
         public static let accountIdValue = "accountId"
-        /// Fork: a login whose sessions run from the Mac's own folder through
-        /// a gateway that tags their model ids (`claude-opus-5-5-gmail`). Its
-        /// usage history reads the default folder's logs, keeping only the
-        /// records with this suffix; the default login leaves them out.
-        public static let usageModelSuffixValue = "usageModelSuffix"
+        /// Fork: the login's account on the local gateway (a CLIProxyAPI auth
+        /// file name). A usage history reads it as `{{account.gatewayAuth}}`,
+        /// usually hashed to match the gateway usage file's `auth_ref`. An
+        /// added login keeps it in its probe config, the plain login under
+        /// its provider's settings; it is never asked on a form.
+        public static let gatewayAuthValue = "gatewayAuth"
 
         /// *Choose Signed-in Folder*: where the vendor keeps a login, and who
         /// is signed in to it.
@@ -439,17 +440,33 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         }
     }
 
-    /// The default account's usage history, filled with `values`.
+    /// The default account's usage history, filled with `values` — `nil` when
+    /// a value is missing, as for an added account: a log no record of it
+    /// can match is no history, not an empty one.
     public func usageHistory(forDefaultAccount values: [String: String]) -> UsageLog.Definition? {
-        try? usageHistory?.filled(values, scope: "account")
+        guard let read = try? usageHistory?.filled(values, scope: "account"), read.unfilled(scope: "account").isEmpty else { return nil }
+        return read
+    }
+
+    /// The default account's values with what the plain login saved: its
+    /// account-scope settings (`Configuration.defaultAccountValues` without
+    /// the configuration) and its gateway account — what its usage history
+    /// is read with.
+    public func defaultAccountValues(saved value: (String) -> String?) -> [String: String] {
+        var values = accountSettings.reduce(into: defaultAccountValues) { values, setting in
+            guard setting.kind != .secret else { return }
+            let filled = setting.value(from: value(setting.id))
+            if !filled.isEmpty { values[setting.id] = filled }
+        }
+        if let gateway = value(Accounts.gatewayAuthValue)?.trimmingCharacters(in: .whitespaces), !gateway.isEmpty {
+            values[Accounts.gatewayAuthValue] = gateway
+        }
+        return values
     }
 
     /// The usage history an added account reads: its own logs — `nil` when the
     /// logs are this Mac's, or a value is missing.
     public func usageHistory(forAccount values: [String: String]) -> UsageLog.Definition? {
-        if let suffix = values[Accounts.usageModelSuffixValue], !suffix.isEmpty {
-            return usageHistory(forDefaultAccount: defaultAccountValues)?.keepingModels(endingWith: suffix)
-        }
         guard let read = try? usageHistory?.forAccount(values), read.unfilled(scope: "account").isEmpty else { return nil }
         return read
     }

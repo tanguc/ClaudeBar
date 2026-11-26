@@ -4,16 +4,23 @@ import Providers
 import Quotas
 import Testing
 
-/// Claude's usage history as data: `claude.json`'s `usageHistory` and
-/// `claude-prices.json`, run on the old analyzer's fixtures — the same
-/// numbers *TODAY'S USAGE* showed before (#190, #207).
+/// Claude's usage history as data: `claude.json`'s `usageHistory` read on the
+/// gateway's usage file (one line per request through CLIProxyAPI, written by
+/// llm-archive), priced with `claude-prices.json`. Each login keeps the lines
+/// of its own gateway account.
 @MainActor
 @Suite
 struct ClaudeUsageHistoryTests {
     private let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
 
+    /// The plain login's gateway account and `auth_ref`, the SHA-256 of its name.
+    private static let westep = "claude-westep.json"
+    private static let westepRef = "0b083adbfdb0b432054cf215dfeda8abf42dc37f0c9e0ae51b7e96ab48f472ca"
+    private static let work = "claude-work.json"
+    private static let workRef = "46d79a7ac757419568146a2389b0ee3cf622f6fe142f7958e52576c700877628"
+
     private func history() throws -> UsageHistory {
-        let definition = try #require(try ProviderFactory.builtIn("claude").defaultAccountHistory)
+        let definition = try #require(try ProviderFactory.builtIn("claude").defaultAccountHistory(gatewayAuth: Self.westep))
         return UsageHistory(log: DataSources.makeUsageLog(definition, scripts: ProviderFactory.builtInScripts,
                                                           environment: { _ in nil }, homeDirectory: home))
     }
@@ -24,16 +31,10 @@ struct ClaudeUsageHistoryTests {
         return try #require(history.report)
     }
 
-    private func write(_ jsonl: String, to name: String = "test-session.jsonl") throws {
-        let dir = home.appendingPathComponent(".claude/projects/test-project")
+    private func write(_ jsonl: String, to name: String = "usage-2026-11-26.jsonl") throws {
+        let dir = home.appendingPathComponent(".local/share/llm-archive/usage")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try jsonl.write(to: dir.appendingPathComponent(name), atomically: true, encoding: .utf8)
-    }
-
-    /// Claude Code's own config, where its route is.
-    private func route(_ json: String) throws {
-        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
-        try json.write(to: home.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
     }
 
     private static func stamp(_ date: Date = Date()) -> String {
@@ -48,15 +49,11 @@ struct ClaudeUsageHistoryTests {
     }
 
     private static func line(_ model: String = "claude-sonnet-4-6", input: Int = 1000, output: Int = 500, cacheWrite: Int = 0,
-                             cacheRead: Int = 0, message: String? = nil, request: String? = nil, at: Date = Date(),
-                             cwd: String? = nil) -> String {
-        let requestId = request.map { #""requestId":"\#($0)","# } ?? ""
-        let messageId = message.map { #""id":"\#($0)","# } ?? ""
-        let directory = cwd.map { #""cwd":"\#($0)","# } ?? ""
-        return #"{"type":"assistant",\#(requestId)"message":{\#(messageId)"model":"\#(model)","usage":{"input_tokens":\#(input),"output_tokens":\#(output),"cache_creation_input_tokens":\#(cacheWrite),"cache_read_input_tokens":\#(cacheRead)}},\#(directory)"timestamp":"\#(stamp(at))"}"#
+                             cacheRead: Int = 0, id: String = UUID().uuidString, at: Date = Date(), ref: String = westepRef) -> String {
+        #"{"v":1,"id":"\#(id)","at":"\#(stamp(at))","provider":"claude","auth_ref":"\#(ref)","auth_type":"oauth","model":"\#(model)","tokens":{"input":\#(input),"output":\#(output),"reasoning":0,"cache_read":\#(cacheRead),"cache_write":\#(cacheWrite)}}"#
     }
 
-    @Test func `should show today's tokens and cost from Claude Code's session logs`() async throws {
+    @Test func `should show today's tokens and cost from the gateway's usage file`() async throws {
         try write(Self.line())
         let report = try await report()
         #expect(report.today.totalTokens == 1500)
@@ -64,7 +61,7 @@ struct ClaudeUsageHistoryTests {
         #expect(report.previous.isEmpty)
     }
 
-    @Test func `should show no usage history when there are no session logs`() async throws {
+    @Test func `should show no usage history when there is no usage file`() async throws {
         let history = try history()
         await history.read()
         #expect(history.report == nil)
@@ -85,73 +82,43 @@ struct ClaudeUsageHistoryTests {
         #expect(today.cacheHitRate > 0.99)
     }
 
-    // MARK: - Streamed and copied messages count once (#207)
-
-    @Test func `should count a message once when it is repeated across content blocks (#207)`() async throws {
-        let line = Self.line(message: "msg_A", request: "req_1")
-        try write([line, line, line].joined(separator: "\n"))
-        #expect(try await report().today.totalTokens == 1500)
-    }
-
-    @Test func `should count a streamed message at its final size (#207)`() async throws {
-        try write([Self.line(output: 1, message: "msg_A", request: "req_1"),
-                   Self.line(output: 1, message: "msg_A", request: "req_1", at: Date().addingTimeInterval(0.1)),
-                   Self.line(output: 500, message: "msg_A", request: "req_1", at: Date().addingTimeInterval(0.9))].joined(separator: "\n"))
-        let today = try await report().today
-        #expect(today.outputTokens == 500)
-        #expect(today.totalTokens == 1500)
-    }
-
-    @Test func `should count a response once when a resumed session copies it into another file (#207)`() async throws {
-        let line = Self.line(message: "msg_A", request: "req_1")
-        try write(line, to: "session-1.jsonl")
-        try write(line, to: "session-2.jsonl")
-        #expect(try await report().today.totalTokens == 1500)
-    }
-
-    @Test func `should count every line that has no message or request id`() async throws {
-        let line = Self.line()
+    @Test func `should count a request once when a replayed batch or the backfill wrote it again`() async throws {
+        let line = Self.line(id: "producer/request/attempt")
         try write([line, line].joined(separator: "\n"))
-        #expect(try await report().today.totalTokens == 3000)
+        try write(line, to: "backfill-2026-11-26.jsonl")
+        #expect(try await report().today.totalTokens == 1500)
     }
 
-    // MARK: - Quota by project (the record's cwd)
-
-    @Test func `should attribute today's records to the projects they were spent in`() async throws {
-        try write([Self.line(message: "a", request: "1", cwd: "/Users/me/workspaces/ClaudeBar/marron"),
-                   Self.line(message: "b", request: "2", cwd: "/Users/me/workspaces/api"),
-                   Self.line(message: "c", request: "3")].joined(separator: "\n"))
-        let today = try await report().today
-
-        #expect(today.projectSplit.map(\.project) == ["api", "marron", ""])
-        #expect(today.projectSplit.reduce(0) { $0 + $1.spend.totalTokens } == today.totalTokens)
+    @Test func `should leave out the requests another gateway account served`() async throws {
+        try write([Self.line(), Self.line(input: 9000, ref: Self.workRef)].joined(separator: "\n"))
+        #expect(try await report().today.totalTokens == 1500)
     }
 
     // MARK: - Prices from claude-prices.json
 
     @Test func `should price models as Anthropic lists them, estimating unknown ones at the newest of their family`() async throws {
         // 1M in / 100K out / 1M cache write / 1M cache read each.
-        try write([Self.line("claude-sonnet-4-6", input: 1_000_000, output: 100_000, cacheWrite: 1_000_000, cacheRead: 1_000_000, message: "a", request: "1"),
-                   Self.line("claude-opus-4-99-20260101", input: 1_000_000, output: 0, message: "b", request: "2"),
-                   Self.line("claude-sonnet-6", input: 1_000_000, output: 0, message: "d", request: "4"),
-                   Self.line("glm-4.6", input: 1_000_000, output: 0, message: "c", request: "3")].joined(separator: "\n"))
+        try write([Self.line("claude-sonnet-4-6", input: 1_000_000, output: 100_000, cacheWrite: 1_000_000, cacheRead: 1_000_000),
+                   Self.line("claude-opus-4-99-20260101", input: 1_000_000, output: 0),
+                   Self.line("claude-sonnet-6", input: 1_000_000, output: 0),
+                   Self.line("glm-4.6", input: 1_000_000, output: 0)].joined(separator: "\n"))
         // Sonnet $8.55, an unknown Opus at Opus 5.5's $4 input, an unknown Sonnet at Sonnet 5.5's $2,
         // a paid gateway's model at the Sonnet estimate $3.
         #expect(try await report().today.totalCost == Decimal(string: "17.55"))
     }
 
     @Test func `should price the current models at today's list prices`() async throws {
-        try write([Self.line("claude-opus-5-5", input: 1_000_000, output: 100_000, message: "a", request: "1"),
-                   Self.line("claude-haiku-4-5-20251001", input: 1_000_000, output: 0, cacheRead: 1_000_000, message: "b", request: "2")]
+        try write([Self.line("claude-opus-5-5", input: 1_000_000, output: 100_000),
+                   Self.line("claude-haiku-4-5-20251001", input: 1_000_000, output: 0, cacheRead: 1_000_000)]
             .joined(separator: "\n"))
         // Opus 5.5: $4 + $2; Haiku 4.5, dated: $1 + $0.10 of cache reads.
         #expect(try await report().today.totalCost == Decimal(string: "7.1"))
     }
 
     @Test func `should price Sonnet 5.5 cache reads, a short Haiku 5.5 prompt, and a newer Haiku as the current one`() async throws {
-        try write([Self.line("claude-sonnet-5-5", input: 0, output: 0, cacheRead: 1_000_000, message: "a", request: "1"),
-                   Self.line("claude-haiku-5-5", input: 50_000, output: 1_000_000, cacheRead: 50_000, message: "b", request: "2"),
-                   Self.line("claude-haiku-6", input: 1_000_000, output: 0, message: "c", request: "3")]
+        try write([Self.line("claude-sonnet-5-5", input: 0, output: 0, cacheRead: 1_000_000),
+                   Self.line("claude-haiku-5-5", input: 50_000, output: 1_000_000, cacheRead: 50_000),
+                   Self.line("claude-haiku-6", input: 1_000_000, output: 0)]
             .joined(separator: "\n"))
         // Sonnet 5.5 reads at 0.05× input: $0.10. Haiku 5.5's 100,000-token prompt at its
         // up-to-100K prices: $0.005 + $0.50 + $0.0005. An unlisted Haiku as Haiku 5.5:
@@ -160,9 +127,9 @@ struct ClaudeUsageHistoryTests {
     }
 
     @Test func `should price a Haiku 5.5 request over 100,000 prompt tokens at the higher prices, cache reads and writes included`() async throws {
-        try write([Self.line("claude-haiku-5-5", input: 100_000, output: 1_000_000, message: "a", request: "1"),
-                   Self.line("claude-haiku-5-5", input: 1_000, output: 0, cacheRead: 100_000, message: "b", request: "2"),
-                   Self.line("claude-haiku-5-5", input: 0, output: 1_000_000, cacheWrite: 200_000, message: "c", request: "3")]
+        try write([Self.line("claude-haiku-5-5", input: 100_000, output: 1_000_000),
+                   Self.line("claude-haiku-5-5", input: 1_000, output: 0, cacheRead: 100_000),
+                   Self.line("claude-haiku-5-5", input: 0, output: 1_000_000, cacheWrite: 200_000)]
             .joined(separator: "\n"))
         // Exactly 100,000: $0.01 + $0.50. Each other request on its own, over: 1,000 in at $0.50
         // and 100,000 reads at $0.05 = $0.0055; 200,000 five-minute writes at $0.625 and 1M out
@@ -170,16 +137,10 @@ struct ClaudeUsageHistoryTests {
         #expect(try await report().today.totalCost == Decimal(string: "3.1405"))
     }
 
-    @Test func `should charge the one-hour price for cache writes kept an hour`() async throws {
-        let line = #"{"type":"assistant","message":{"model":"claude-opus-5-5","usage":{"input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":1000000,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":100000,"ephemeral_1h_input_tokens":900000}}},"timestamp":"\#(Self.stamp())"}"#
-        try write(line)
-        let today = try await report().today
-        // Opus 5.5: 0.1M × $5 + 0.9M × $8 of writes, $0.004 in, $0.01 out.
-        #expect(today.totalCost == Decimal(string: "7.714"))
-        #expect(today.cacheCreationTokens == 1_000_000)
+    @Test func `should price a gateway alias at its model's list price`() async throws {
+        try write(Self.line("claude-opus-5-5-gmail", input: 1_000_000, output: 100_000))
+        #expect(try await report().today.totalCost == Decimal(string: "6"))
     }
-
-    // MARK: - Local inference costs nothing (#190)
 
     @Test func `should cost nothing and save nothing when the model is open-weight (#190)`() async throws {
         try write(Self.line("qwen3-coder:30b", cacheRead: 1_000_000))
@@ -190,66 +151,30 @@ struct ClaudeUsageHistoryTests {
         #expect(today.totalTokens == 1500)
     }
 
-    @Test func `should cost nothing when an unpriced model runs while Claude Code is routed at this Mac (#190)`() async throws {
-        try route(#"{"env":{"ANTHROPIC_BASE_URL":"http://localhost:11434"}}"#)
-        try write(Self.line("acme-internal-7b", cacheRead: 1_000_000))
-        let today = try await report().today
-        #expect(today.totalCost == 0)
-        #expect(today.cachedSavings == 0)
-    }
+    // MARK: - Each login reads its own gateway account
 
-    @Test func `should treat Claude Code as local when only its providers list a local route (#190)`() async throws {
-        try route(#"{"providers":[{"base_url":"https://api.anthropic.com"},{"env":{"ANTHROPIC_BASE_URL":"http://[::1]:11434"}}]}"#)
-        try write(Self.line("some-unknown-model"))
-        #expect(try await report().today.totalCost == 0)
-    }
-
-    @Test func `should keep the estimate when a remote route outranks a local provider entry`() async throws {
-        try route(#"{"env":{"ANTHROPIC_BASE_URL":"https://api.z.ai/api/anthropic"},"providers":[{"base_url":"http://localhost:11434"}]}"#)
-        try write(Self.line("some-unknown-model"))
-        #expect(try await report().today.totalCost == Decimal(string: "0.0105"))
-    }
-
-    @Test func `should keep a known Anthropic model's list price on a local route`() async throws {
-        try route(#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:1234"}}"#)
-        try write(Self.line())
-        #expect(try await report().today.totalCost == Decimal(string: "0.0105"))
-    }
-
-    @Test func `should keep yesterday's estimate when Claude Code is routed locally only now`() async throws {
-        try route(#"{"env":{"ANTHROPIC_BASE_URL":"http://localhost:11434"}}"#)
-        try write(Self.line("some-unknown-model", at: Self.yesterdayNoon))
-        let report = try await report()
-        #expect(report.today.isEmpty)
-        #expect(report.previous.totalCost == Decimal(string: "0.0105"))
-        #expect(report.previous.totalTokens == 1500)
-    }
-
-    // MARK: - Each login reads its own folder
-
-    /// Claude with one added login in `work`, every history over `home`.
-    private func provider(work: URL) throws -> Provider {
+    /// Claude with one added login on the `work` gateway account, every history over `home`.
+    private func provider(settings: InMemoryProviderSettings = InMemoryProviderSettings()) throws -> Provider {
         let definition = try ProviderFactory.builtIn("claude")
         let make = { (history: UsageLog.Definition) in
             UsageHistory(log: DataSources.makeUsageLog(history, scripts: ProviderFactory.builtInScripts,
                                                        environment: { _ in nil }, homeDirectory: self.home))
         }
         return Provider(
-            definition: definition, settings: InMemoryProviderSettings(),
+            definition: definition, settings: settings,
             accounts: [ProviderAccountConfig(accountId: "work", label: "", email: "work@example.com",
-                                             probeConfig: ["folder": work.path, "accountId": "work@example.com", "credentialService": "fixture-work"])],
+                                             probeConfig: ["folder": home.appendingPathComponent("work-claude").path,
+                                                           "accountId": "work@example.com", "credentialService": "fixture-work",
+                                                           "gatewayAuth": Self.work])],
             makeDataSource: { source, _ in DataSources.make(source, providerId: "claude") },
-            usageHistory: definition.defaultAccountHistory.map(make),
+            usageHistory: definition.defaultAccountHistory(gatewayAuth: Self.westep).map(make),
             makeUsageHistory: { history, _ in make(history) }
         )
     }
 
-    @Test func `should show an added login the usage from its own config folder, never the default's`() async throws {
-        let work = home.appendingPathComponent("work-claude")
-        try FileManager.default.createDirectory(at: work.appendingPathComponent("projects/p"), withIntermediateDirectories: true)
-        try Self.line(input: 2000, output: 1000).write(to: work.appendingPathComponent("projects/p/s.jsonl"), atomically: true, encoding: .utf8)
-        try write(Self.line())
-        let provider = try provider(work: work)
+    @Test func `should show an added login the requests of its own gateway account, never the default's`() async throws {
+        try write([Self.line(), Self.line(input: 2000, output: 1000, ref: Self.workRef)].joined(separator: "\n"))
+        let provider = try provider()
         let added = try #require(provider.accounts.first { !$0.isDefault })
 
         await provider.defaultAccount.usageHistory?.read()
@@ -260,20 +185,8 @@ struct ClaudeUsageHistoryTests {
         #expect(added.usageHistory !== provider.defaultAccount.usageHistory)
     }
 
-    @Test func `should cost nothing when an added login's own folder routes Claude Code at this Mac`() async throws {
-        let work = home.appendingPathComponent("work-claude")
-        try FileManager.default.createDirectory(at: work.appendingPathComponent("projects/p"), withIntermediateDirectories: true)
-        try Self.line("acme-internal-7b").write(to: work.appendingPathComponent("projects/p/s.jsonl"), atomically: true, encoding: .utf8)
-        try #"{"env":{"ANTHROPIC_BASE_URL":"http://localhost:11434"}}"#.write(to: work.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
-        let added = try #require(try provider(work: work).accounts.first { !$0.isDefault })
-
-        await added.usageHistory?.read()
-
-        #expect(added.usageHistory?.report?.today.totalCost == 0)
-    }
-
     @Test func `should drop an added login's usage history when the login is removed`() throws {
-        let provider = try provider(work: home.appendingPathComponent("work-claude"))
+        let provider = try provider()
         let added = try #require(provider.accounts.first { !$0.isDefault })
         #expect(added.usageHistory != nil)
 
@@ -282,23 +195,34 @@ struct ClaudeUsageHistoryTests {
         #expect(added.usageHistory == nil)
     }
 
-    @Test func `should read an added login's logs and route from its config folder, and have no history without one`() throws {
-        let own = try #require(try ProviderFactory.builtIn("claude").usageHistory(forAccount: ["folder": "/tmp/work"]))
-        #expect(own.records.source == .files(glob: "/tmp/work/projects/**/*.jsonl", format: .jsonLines))
-        #expect(own.freeWhen?.localEndpoint?.file == "/tmp/work/.claude.json")
-        #expect(own.freeWhen?.localEndpoint?.url.count == 2)
-        #expect(try ProviderFactory.builtIn("claude").usageHistory(forAccount: [:]) == nil)
+    @Test func `should match an added login's records by its gateway account's hash, and have no history without one`() throws {
+        let definition = try ProviderFactory.builtIn("claude")
+        let own = try #require(definition.usageHistory(forAccount: ["folder": "/tmp/work", "gatewayAuth": Self.work]))
+        #expect(own.records.shapes.first?.where == Match(path: "$.auth_ref", equals: .string(Self.workRef)))
+        #expect(definition.usageHistory(forAccount: ["folder": "/tmp/work"]) == nil)
+        #expect(definition.usageHistory(forAccount: [:]) == nil)
+    }
+
+    @Test func `should give the plain login no usage history until its gateway account is set`() throws {
+        let definition = try ProviderFactory.builtIn("claude")
+        #expect(definition.defaultAccountHistory == nil)
+        let settings = InMemoryProviderSettings()
+        settings.setValue(Self.westep, "gatewayAuth", forProvider: "claude")
+        let values = definition.defaultAccountValues(saved: { settings.value($0, forProvider: "claude") })
+        #expect(values["gatewayAuth"] == Self.westep)
+        #expect(definition.usageHistory(forDefaultAccount: values)?.records.shapes.first?.where
+            == Match(path: "$.auth_ref", equals: .string(Self.westepRef)))
     }
 
     @Test func `should leave the Mac's other apps out of an added login's history`() throws {
         #expect(try ProviderFactory.builtIn("claude").usageHistory?.otherApps?.map(\.label) == ["Claude Desktop"])
-        #expect(try ProviderFactory.builtIn("claude").usageHistory(forAccount: ["folder": "/tmp/work"])?.otherApps == nil)
+        #expect(try ProviderFactory.builtIn("claude").usageHistory(forAccount: ["gatewayAuth": Self.work])?.otherApps == nil)
     }
 
     // MARK: - Claude Desktop's buddy-tokens.json (#198)
 
     private func desktop() async throws -> UsageHistory {
-        let definition = try #require(try ProviderFactory.builtIn("claude").defaultAccountHistory)
+        let definition = try #require(try ProviderFactory.builtIn("claude").defaultAccountHistory(gatewayAuth: Self.westep))
         var platform = Platform.current
         platform.applicationData = { home, _ in home.appendingPathComponent("Library/Application Support") }
         let fixturePlatform = platform
