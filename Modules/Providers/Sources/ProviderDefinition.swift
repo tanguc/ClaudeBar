@@ -161,6 +161,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         /// signed in to it.
         public static let folderValue = "folder"
         public static let accountIdValue = "accountId"
+        /// Fork: a login whose sessions run from the Mac's own folder through
+        /// a gateway that tags their model ids (`claude-opus-5-5-gmail`). Its
+        /// usage history reads the default folder's logs, keeping only the
+        /// records with this suffix; the default login leaves them out.
+        public static let usageModelSuffixValue = "usageModelSuffix"
 
         /// *Choose Signed-in Folder*: where the vendor keeps a login, and who
         /// is signed in to it.
@@ -442,6 +447,9 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
     /// The usage history an added account reads: its own logs — `nil` when the
     /// logs are this Mac's, or a value is missing.
     public func usageHistory(forAccount values: [String: String]) -> UsageLog.Definition? {
+        if let suffix = values[Accounts.usageModelSuffixValue], !suffix.isEmpty {
+            return usageHistory(forDefaultAccount: defaultAccountValues)?.keepingModels(endingWith: suffix)
+        }
         guard let read = try? usageHistory?.forAccount(values), read.unfilled(scope: "account").isEmpty else { return nil }
         return read
     }

@@ -45,8 +45,9 @@ public struct UsageLog: Sendable {
         if let scan = await reader.scan {
             AppLog.probes.info("Usage history: scanned the log's recent files (\(scan.reused) unchanged, \(scan.extended) appended, \(scan.reparsed) read in full)")
         }
-        let records = LogRecord.deduplicated(raw)
-        AppLog.probes.info("Usage history: \(raw.count) raw records, \(records.count) after dedup")
+        let mine = definition.models.map { filter in raw.filter { filter.keeps($0.model) } } ?? raw
+        let records = LogRecord.deduplicated(mine)
+        AppLog.probes.info("Usage history: \(raw.count) raw records, \(mine.count) this login's, \(records.count) after dedup")
 
         // `freeWhen` describes the route now, so it prices only the day that
         // holds now: an earlier day keeps its estimate.
@@ -79,14 +80,53 @@ extension UsageLog {
         /// count — each read on its own, never added to these records. An
         /// added login's patch sets it to `null`: the apps belong to the Mac.
         public let otherApps: [OtherApp]?
+        /// Which records are this login's when several logins write one log,
+        /// told apart by the model id a gateway gave each (fork).
+        public let models: ModelFilter?
 
         public init(records: Records, prices: Prices? = nil, freeWhen: FreeWhen? = nil, sessionGap: Double? = nil,
-                    otherApps: [OtherApp]? = nil) {
+                    otherApps: [OtherApp]? = nil, models: ModelFilter? = nil) {
             self.records = records
             self.prices = prices
             self.freeWhen = freeWhen
             self.sessionGap = sessionGap
             self.otherApps = otherApps
+            self.models = models
+        }
+
+        /// The same log read for one login of several: only the records
+        /// whose model id ends with `suffix`, and none of the Mac's other apps.
+        public func keepingModels(endingWith suffix: String) -> Definition {
+            Definition(records: records, prices: prices, freeWhen: freeWhen, sessionGap: sessionGap,
+                       otherApps: nil, models: ModelFilter(endingWith: suffix))
+        }
+
+        /// The same log without the records other logins' model suffixes mark.
+        public func droppingModels(endingWith suffixes: [String]) -> Definition {
+            guard !suffixes.isEmpty else { return self }
+            return Definition(records: records, prices: prices, freeWhen: freeWhen, sessionGap: sessionGap,
+                              otherApps: otherApps, models: ModelFilter(notEndingWith: suffixes.sorted()))
+        }
+    }
+
+    /// `{ "endingWith": "-gmail" }` keeps a record whose model id ends so;
+    /// `{ "notEndingWith": ["-gmail"] }` drops one. A record with no model is
+    /// kept unless `endingWith` asks for one.
+    public struct ModelFilter: Sendable, Equatable, Codable {
+        public let endingWith: String?
+        public let notEndingWith: [String]?
+
+        public init(endingWith: String? = nil, notEndingWith: [String]? = nil) {
+            self.endingWith = endingWith
+            self.notEndingWith = notEndingWith
+        }
+
+        public func keeps(_ model: String?) -> Bool {
+            if let endingWith, !endingWith.isEmpty {
+                guard let model, model.hasSuffix(endingWith) else { return false }
+            }
+            guard let model else { return true }
+            return !(notEndingWith ?? []).contains { !$0.isEmpty && model.hasSuffix($0) }
         }
     }
 
@@ -491,7 +531,8 @@ extension DataSources {
         }
         let records = UsageLog.Records(source: source, shapes: definition.records.shapes)
         let own = UsageLog.Definition(records: records, prices: definition.prices,
-                                      freeWhen: definition.freeWhen, sessionGap: definition.sessionGap)
+                                      freeWhen: definition.freeWhen, sessionGap: definition.sessionGap,
+                                      models: definition.models)
         hash.update(data: (try? encoder.encode(own)) ?? Data())
         if case .files(let files, _) = definition.records.source {
             hash.update(data: Data(expand(files).utf8))

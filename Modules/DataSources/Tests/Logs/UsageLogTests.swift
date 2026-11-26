@@ -68,6 +68,21 @@ struct UsageLogTests {
         #expect(days[0].totalTokens == 3000)
     }
 
+    @Test func `should count only a login's own records when its model suffix marks them`() async throws {
+        try write([line(model: "m-medium-2", id: "a", at: stamp()),
+                   line(model: "m-medium-2-other", id: "b", input: 2000, output: 1000, at: stamp())])
+        let own = await log(Self.definition.keepingModels(endingWith: "-other")).days(last: 1)[0]
+        let rest = await log(Self.definition.droppingModels(endingWith: ["-other"])).days(last: 1)[0]
+        #expect(own.totalTokens == 3000)
+        #expect(rest.totalTokens == 1500)
+    }
+
+    @Test func `should read another login's logs apart, so its days are summed again`() {
+        let plain = log().fingerprint
+        #expect(log(Self.definition.keepingModels(endingWith: "-other")).fingerprint != plain)
+        #expect(log(Self.definition.droppingModels(endingWith: [])).fingerprint == plain)
+    }
+
     @Test func `should show every day empty when nothing is logged`() async {
         #expect(await log().days(last: 2).allSatisfy(\.isEmpty))
     }
