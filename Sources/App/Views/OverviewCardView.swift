@@ -174,7 +174,7 @@ private struct OverviewQuotaLineView: View {
             // The line's countdown stays in two units — `resetDescription`
             // caps itself there — so "2d 1h" fits the held column that the
             // full "Resets in 1d 18h 59m" would spill out of.
-            if let reset = quota.resetDescription ?? quota.resetText {
+            if let reset = quota.resetDescriptionWithClock ?? quota.resetText {
                 Text(reset)
                     .popoverFont(9, weight: .medium)
                     .foregroundStyle(theme.textTertiary)
@@ -306,7 +306,7 @@ struct OverviewCardView: View {
             }
             .popoverFont(10, weight: .semibold)
             .foregroundStyle(theme.textPrimary)
-            if let reset = quota.resetTimestampDescription ?? quota.resetText {
+            if let reset = quota.resetTimestampWithClock ?? quota.resetText {
                 Text(reset)
                     .popoverFont(9, weight: .medium)
                     .foregroundStyle(theme.textTertiary)

@@ -1156,7 +1156,7 @@ struct MenuContentView: View {
         // cards to collapse; the note renders inline in the header.
         let isNoteOnly = group.quotas.isEmpty
         let isCollapsed = !isNoteOnly && collapsedQuotaGroups.contains(group.id)
-        let sharedReset = group.quotas.sharedResetDescription()
+        let sharedReset = group.quotas.sharedResetDescription(withClock: true)
         return VStack(alignment: .leading, spacing: 8) {
             Button {
                 withAnimation(.easeOut(duration: 0.15)) {
@@ -1283,14 +1283,14 @@ struct MenuContentView: View {
             }
 
             if !snapshot.hasQuotaGroups, !snapshot.quotas.isEmpty {
-                let sharedReset = snapshot.quotas.sharedResetDescription()
+                let sharedReset = snapshot.quotas.sharedResetDescription(withClock: true)
                 if let sharedReset {
                     sharedResetRow(sharedReset)
                 }
             }
 
             if !snapshot.hasQuotaGroups, !snapshot.quotas.isEmpty {
-                let sharedReset = snapshot.quotas.sharedResetDescription()
+                let sharedReset = snapshot.quotas.sharedResetDescription(withClock: true)
                 TwoColumnCardGrid(
                     items: Array(snapshot.quotas.enumerated()),
                     id: \.element.quotaType
@@ -1992,7 +1992,7 @@ struct WrappedStatCard: View {
             QuotaCardBar(quota: quota, animate: animateProgress, delay: delay)
 
             // Reset info (hidden when the grid hoisted a shared countdown)
-            if showsReset, let resetText = quota.resetTimestampDescription ?? quota.resetText ?? quota.resetDescription {
+            if showsReset, let resetText = quota.resetTimestampWithClock ?? quota.resetText ?? quota.resetDescription {
                 if theme.isOutlined {
                     // Always one row, the time always whole. As the card
                     // narrows, "Resets in" gives way to a clock, then the

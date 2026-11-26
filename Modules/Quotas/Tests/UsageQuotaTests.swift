@@ -5,6 +5,46 @@ import Foundation
 @Suite
 struct UsageQuotaTests {
 
+    // MARK: - Reset clock (fork)
+
+    private static let paris: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+        return calendar
+    }()
+
+    private static func quota(resetting at: Date) -> UsageQuota {
+        UsageQuota(percentRemaining: 50, quotaType: .weekly, providerId: "claude", resetsAt: at)
+    }
+
+    private static func date(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        paris.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+    }
+
+    @Test
+    func `should name today, tomorrow or the date beside the reset's time`() {
+        let now = Self.date(26, 8, 30)
+        let fr = Locale(identifier: "fr_FR")
+        #expect(Self.quota(resetting: Self.date(26, 18)).resetClock(now: now, calendar: Self.paris, locale: fr) == "today 18:00")
+        #expect(Self.quota(resetting: Self.date(27, 18, 5)).resetClock(now: now, calendar: Self.paris, locale: fr) == "tomorrow 18:05")
+        #expect(Self.quota(resetting: Self.date(28, 6)).resetClock(now: now, calendar: Self.paris, locale: fr)?.hasSuffix("06:00") == true)
+        #expect(Self.quota(resetting: Self.date(28, 6)).resetClock(now: now, calendar: Self.paris, locale: fr)?.hasPrefix("28") == true)
+    }
+
+    @Test
+    func `should give no reset clock once the reset has passed or is unknown`() {
+        let now = Self.date(26, 8, 30)
+        #expect(Self.quota(resetting: Self.date(26, 8)).resetClock(now: now, calendar: Self.paris) == nil)
+        #expect(UsageQuota(percentRemaining: 50, quotaType: .weekly, providerId: "claude").resetClock() == nil)
+    }
+
+    @Test
+    func `should follow the countdown with the reset's clock`() {
+        let quota = Self.quota(resetting: Date().addingTimeInterval(3 * 3600 + 15 * 60 + 30))
+        #expect(quota.resetTimestampWithClock?.hasPrefix("Resets in 3h 15m - ") == true)
+        #expect(quota.resetTimestampDescription == "Resets in 3h 15m")
+    }
+
     // MARK: - Creating Quotas
 
     @Test

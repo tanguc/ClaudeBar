@@ -401,6 +401,44 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         return "Resets in \(parts.joined(separator: " "))"
     }
 
+    /// When the quota resets, on the clock: "today 18:00", "tomorrow 18:00",
+    /// "28 Nov 18:00". Nil when the reset time is unknown or already past.
+    public func resetClock(now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current) -> String? {
+        guard let resetsAt, resetsAt > now else { return nil }
+        let time = DateFormatter()
+        time.locale = locale
+        time.calendar = calendar
+        time.timeZone = calendar.timeZone
+        time.setLocalizedDateFormatFromTemplate("jmm")
+        let clock = time.string(from: resetsAt)
+        if calendar.isDate(resetsAt, inSameDayAs: now) { return "today \(clock)" }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
+           calendar.isDate(resetsAt, inSameDayAs: tomorrow) { return "tomorrow \(clock)" }
+        let day = DateFormatter()
+        day.locale = locale
+        day.calendar = calendar
+        day.timeZone = calendar.timeZone
+        day.setLocalizedDateFormatFromTemplate("dMMM")
+        return "\(day.string(from: resetsAt)) \(clock)"
+    }
+
+    /// `description` followed by the reset's clock: "Resets in 1d 4h - tomorrow 18:00".
+    public static func withResetClock(_ description: String?, of quota: UsageQuota) -> String? {
+        guard let description else { return nil }
+        guard let clock = quota.resetClock() else { return description }
+        return "\(description) - \(clock)"
+    }
+
+    /// `resetTimestampDescription` with the reset's clock after it.
+    public var resetTimestampWithClock: String? {
+        Self.withResetClock(resetTimestampDescription, of: self)
+    }
+
+    /// `resetDescription` with the reset's clock after it.
+    public var resetDescriptionWithClock: String? {
+        Self.withResetClock(resetDescription, of: self)
+    }
+
     /// Human-readable description of time until reset
     public var resetDescription: String? {
         guard let timeUntilReset else { return nil }
@@ -433,7 +471,7 @@ public extension Collection where Element == UsageQuota {
     /// Returns a single `resetTimestampDescription` when there are at least two
     /// quotas, every quota has a `resetsAt`, and those timestamps sit within
     /// 60 seconds of each other. Otherwise nil — callers should keep per-card clocks.
-    func sharedResetDescription() -> String? {
+    func sharedResetDescription(withClock: Bool = false) -> String? {
         guard count >= 2 else { return nil }
         let dates = compactMap(\.resetsAt)
         guard dates.count == count,
@@ -441,6 +479,6 @@ public extension Collection where Element == UsageQuota {
               let latest = dates.max(),
               latest.timeIntervalSince(earliest) <= 60
         else { return nil }
-        return first?.resetTimestampDescription
+        return withClock ? first?.resetTimestampWithClock : first?.resetTimestampDescription
     }
 }
