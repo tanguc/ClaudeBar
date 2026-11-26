@@ -350,6 +350,7 @@ final class StatusItemLabelDriver {
         lastImage = image
         button.image = image
         button.imagePosition = .imageOnly
+        pinLength(to: button)
         let primaryText = [content.primaryProviderName, content.label?.text, content.primaryIsResting ? RestText.readoutSuffix : nil]
             .compactMap { $0 }.joined(separator: " ")
         let additionalTexts = content.additionalLabels.map { label in
@@ -365,6 +366,19 @@ final class StatusItemLabelDriver {
         lastTooltip = tooltip
         button.toolTip = tooltip.isEmpty ? nil : tooltip
         button.setAccessibilityLabel(tooltip.isEmpty ? "ClaudeBar" : tooltip)
+    }
+
+    /// Fork: a fixed length sized to our image. With a variable length every
+    /// image swap, SwiftUI's 1x1 wipe and the KVO restore included, resizes
+    /// the menu bar window, and on macOS 26 that resize races the status-item
+    /// XPC batch and aborts the app (`assertion failure: "needed"`, #281).
+    /// Fixed, the bar window changes size only when our width really does.
+    private func pinLength(to button: NSStatusBarButton) {
+        guard let statusItem else { return }
+        let width = ceil(button.intrinsicContentSize.width)
+        guard width > 1, abs(statusItem.length - width) >= 0.5 else { return }
+        AppLog.ui.debug("Status item length \(statusItem.length) -> \(width)")
+        statusItem.length = width
     }
 
     private func resolvedTheme(for content: LabelContent) -> any AppThemeProvider {

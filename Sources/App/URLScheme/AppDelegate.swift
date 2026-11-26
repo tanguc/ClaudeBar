@@ -32,6 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         deliverPending()
     }
 
+    /// Fork: a clean exit says so, so a log that ends without this line
+    /// ended in a crash (its report is in ~/Library/Logs/DiagnosticReports).
+    func applicationWillTerminate(_ notification: Notification) {
+        AppLog.ui.info("ClaudeBar quitting normally")
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A notification's button (In use: *Use for New Sessions*, *Undo*)
         // opens its `claudebar://` link through the routing above.
