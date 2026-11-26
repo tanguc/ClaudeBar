@@ -98,35 +98,51 @@ extension UsageLog {
         /// whose model id ends with `suffix`, and none of the Mac's other apps.
         public func keepingModels(endingWith suffix: String) -> Definition {
             Definition(records: records, prices: prices, freeWhen: freeWhen, sessionGap: sessionGap,
-                       otherApps: nil, models: ModelFilter(endingWith: suffix))
+                       otherApps: nil, models: (models ?? ModelFilter()).with(endingWith: suffix))
         }
 
         /// The same log without the records other logins' model suffixes mark.
         public func droppingModels(endingWith suffixes: [String]) -> Definition {
             guard !suffixes.isEmpty else { return self }
             return Definition(records: records, prices: prices, freeWhen: freeWhen, sessionGap: sessionGap,
-                              otherApps: otherApps, models: ModelFilter(notEndingWith: suffixes.sorted()))
+                              otherApps: otherApps, models: (models ?? ModelFilter()).with(notEndingWith: suffixes.sorted()))
         }
     }
 
-    /// `{ "endingWith": "-gmail" }` keeps a record whose model id ends so;
-    /// `{ "notEndingWith": ["-gmail"] }` drops one. A record with no model is
-    /// kept unless `endingWith` asks for one.
+    /// Which model ids are this log's: `endingWith` / `startingWith` keep a
+    /// record only when its model matches, `notEndingWith` / `notStartingWith`
+    /// drop one that does. A record with no model is kept unless a keep rule
+    /// asks for one. `{ "startingWith": "copilot/" }` in a definition reads
+    /// one gateway's sessions out of a shared log.
     public struct ModelFilter: Sendable, Equatable, Codable {
         public let endingWith: String?
         public let notEndingWith: [String]?
+        public let startingWith: String?
+        public let notStartingWith: [String]?
 
-        public init(endingWith: String? = nil, notEndingWith: [String]? = nil) {
+        public init(endingWith: String? = nil, notEndingWith: [String]? = nil,
+                    startingWith: String? = nil, notStartingWith: [String]? = nil) {
             self.endingWith = endingWith
             self.notEndingWith = notEndingWith
+            self.startingWith = startingWith
+            self.notStartingWith = notStartingWith
+        }
+
+        func with(endingWith suffix: String) -> ModelFilter {
+            ModelFilter(endingWith: suffix, notEndingWith: notEndingWith, startingWith: startingWith, notStartingWith: notStartingWith)
+        }
+
+        func with(notEndingWith suffixes: [String]) -> ModelFilter {
+            ModelFilter(endingWith: endingWith, notEndingWith: suffixes, startingWith: startingWith, notStartingWith: notStartingWith)
         }
 
         public func keeps(_ model: String?) -> Bool {
-            if let endingWith, !endingWith.isEmpty {
-                guard let model, model.hasSuffix(endingWith) else { return false }
-            }
-            guard let model else { return true }
-            return !(notEndingWith ?? []).contains { !$0.isEmpty && model.hasSuffix($0) }
+            let wanted = [endingWith, startingWith].contains { !($0 ?? "").isEmpty }
+            guard let model else { return !wanted }
+            if let endingWith, !endingWith.isEmpty, !model.hasSuffix(endingWith) { return false }
+            if let startingWith, !startingWith.isEmpty, !model.hasPrefix(startingWith) { return false }
+            if (notEndingWith ?? []).contains(where: { !$0.isEmpty && model.hasSuffix($0) }) { return false }
+            return !(notStartingWith ?? []).contains { !$0.isEmpty && model.hasPrefix($0) }
         }
     }
 

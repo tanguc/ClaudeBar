@@ -396,6 +396,7 @@
       }
     },
     "sessionGap": 1800,
+    "models": { "notStartingWith": ["copilot/"] },
     "otherApps": [
       {
         "label": "Claude Desktop",

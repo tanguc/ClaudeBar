@@ -261,5 +261,33 @@
         }
       }
     }
-  ]
+  ],
+  "usageHistory": {
+    "records": {
+      "files": "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
+      "format": "jsonLines",
+      "where": {
+        "path": "$.type",
+        "equals": "assistant"
+      },
+      "at": "$.timestamp",
+      "id": [
+        "$.message.id",
+        "$.requestId"
+      ],
+      "model": "$.message.model",
+      "project": "$.cwd",
+      "tokens": {
+        "input": "$.message.usage.input_tokens",
+        "output": "$.message.usage.output_tokens",
+        "cacheWrite": "$.message.usage.cache_creation_input_tokens",
+        "cacheWrite1h": "$.message.usage.cache_creation.ephemeral_1h_input_tokens",
+        "cacheRead": "$.message.usage.cache_read_input_tokens"
+      }
+    },
+    "sessionGap": 1800,
+    "models": {
+      "startingWith": "copilot/"
+    }
+  }
 }
