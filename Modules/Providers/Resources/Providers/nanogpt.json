@@ -56,7 +56,7 @@
     "records": {
       "files": "${LLM_ARCHIVE_USAGE:-~/.local/share/llm-archive/usage}/*.jsonl",
       "format": "jsonLines",
-      "where": { "path": "$.auth_ref", "equals": "{{account.gatewayAuth#sha256.64}}" },
+      "where": { "path": "$.base_url", "equals": "https://api.nano-gpt.com/api" },
       "at": "$.at",
       "id": ["$.id"],
       "model": "$.model",

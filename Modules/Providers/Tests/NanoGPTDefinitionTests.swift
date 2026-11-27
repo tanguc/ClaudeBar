@@ -91,12 +91,10 @@ struct NanoGPTDefinitionTests {
         await #expect(throws: UsageError.authenticationRequired) { try await make(usageStatus: 401).refreshPlain() }
     }
 
-    @Test func `should read the gateway usage file for its own gateway account only`() throws {
-        let definition = try ProviderFactory.builtIn("nanogpt")
-        #expect(definition.defaultAccountHistory == nil)
-        let history = try #require(definition.defaultAccountHistory(gatewayAuth: "claude:apikey:51e84b2e15b2"))
-        // sha-256 of the gateway's auth id, as the usage file's auth_ref
-        #expect(history.records.shapes.first?.where == Match(path: "$.auth_ref", equals: .string("44371921b5175e84f349d1df87d077150eace2d7354de265fa14bc50c09b90de")))
+    @Test func `should read the gateway usage file's NanoGPT requests by base url, whatever key served them`() throws {
+        let history = try #require(try ProviderFactory.builtIn("nanogpt").defaultAccountHistory)
+        // the base url, not auth_ref: the gateway's id for an api key hashes the key, so a rotation would change it
+        #expect(history.records.shapes.first?.where == Match(path: "$.base_url", equals: .string("https://api.nano-gpt.com/api")))
         #expect(!UsageHistory(log: DataSources.makeUsageLog(history, environment: { _ in nil })).knowsCost)
     }
 }
