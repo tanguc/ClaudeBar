@@ -1,0 +1,72 @@
+{
+  "profile": {
+    "id": "nanogpt",
+    "name": "NanoGPT",
+    "links": {
+      "dashboard": "https://nano-gpt.com/usage"
+    },
+    "look": {
+      "symbol": "n.circle.fill",
+      "color": { "light": [0.16, 0.55, 0.42], "dark": [0.24, 0.72, 0.55] },
+      "gradientEnd": { "light": [0.1, 0.4, 0.32], "dark": [0.16, 0.55, 0.45] }
+    }
+  },
+  "enabledByDefault": false,
+  "order": 145,
+  "settings": [
+    { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" },
+    { "id": "authEnvVar", "label": "Environment variable", "default": "NANOGPT_API_KEY" }
+  ],
+  "defaultDataSource": "api",
+  "dataSources": [
+    {
+      "kind": "api",
+      "label": "API",
+      "summary": "Reads the subscription's input-token and image quotas and the account balance.",
+      "credential": { "firstOf": [ { "environment": "{{setting.authEnvVar}}" }, { "setting": "apiKey" } ] },
+      "fetch": {
+        "http": {
+          "steps": [
+            {
+              "name": "usage",
+              "request": {
+                "url": "https://api.nano-gpt.com/api/subscription/v1/usage",
+                "headers": { "Authorization": "Bearer {{token}}", "Accept": "application/json" },
+                "timeout": 20
+              },
+              "attempts": 2
+            },
+            {
+              "name": "balance",
+              "optional": true,
+              "request": {
+                "url": "https://api.nano-gpt.com/api/check-balance",
+                "method": "POST",
+                "headers": { "x-api-key": "{{token}}", "Accept": "application/json" },
+                "timeout": 20
+              }
+            }
+          ]
+        }
+      },
+      "mapping": { "script": { "file": "nanogpt-usage.js" } }
+    }
+  ],
+  "usageHistory": {
+    "records": {
+      "files": "${LLM_ARCHIVE_USAGE:-~/.local/share/llm-archive/usage}/*.jsonl",
+      "format": "jsonLines",
+      "where": { "path": "$.auth_ref", "equals": "{{account.gatewayAuth#sha256.64}}" },
+      "at": "$.at",
+      "id": ["$.id"],
+      "model": "$.model",
+      "tokens": {
+        "input": "$.tokens.input",
+        "output": "$.tokens.output",
+        "cacheWrite": "$.tokens.cache_write",
+        "cacheRead": "$.tokens.cache_read"
+      }
+    },
+    "sessionGap": 1800
+  }
+}
