@@ -12,7 +12,7 @@ public final class KeychainDestinationSecrets: DestinationSecrets, @unchecked Se
     /// GitHub, MiniMax and DeepSeek tokens: the app's existing bar, not a new
     /// low, and never the first choice.
     public init(
-        keychain: any CredentialRepository = KeychainCredentialRepository.shared,
+        keychain: any CredentialRepository = FileCredentialRepository.shared,
         fallback: any CredentialRepository = UserDefaultsCredentialRepository.shared
     ) {
         self.keychain = keychain

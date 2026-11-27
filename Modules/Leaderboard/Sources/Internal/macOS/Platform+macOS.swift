@@ -2,12 +2,12 @@
 import Foundation
 
 extension Platform {
-    /// The Mac: the key in the Keychain, and in the app's UserDefaults when the
-    /// Keychain refuses a locally built, ad-hoc signed app; the machine through
+    /// The Mac: the key in the app's UserDefaults (fork: never the Keychain,
+    /// whose prompts come back with every local rebuild); the machine through
     /// the I/O Registry.
     static let current = Platform(
         deviceName: "Mac",
-        signingKeyStore: FallbackSigningKeyStore(secure: KeychainSigningKeyStore(), fallback: DefaultsSigningKeyStore()),
+        signingKeyStore: DefaultsSigningKeyStore(),
         machineIdentity: IOKitMachineIdentity()
     )
 }

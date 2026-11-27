@@ -34,7 +34,7 @@ public final class JSONSettingsRepository:
     public init(
         store: JSONSettingsStore,
         credentials: UserDefaults = .standard,
-        secureCredentials: any CredentialRepository = KeychainCredentialRepository.shared
+        secureCredentials: any CredentialRepository = FileCredentialRepository.shared
     ) {
         self.store = store
         self.credentials = credentials

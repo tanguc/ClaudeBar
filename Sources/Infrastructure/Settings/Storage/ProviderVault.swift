@@ -9,7 +9,7 @@ public struct ProviderVault: SecretVault, @unchecked Sendable {
     /// UserDefaults is thread-safe. Only the default login can read a legacy key.
     private let legacyStore: UserDefaults
 
-    public init(credentials: any CredentialRepository = KeychainCredentialRepository.shared, legacyStore: UserDefaults = .standard) {
+    public init(credentials: any CredentialRepository = FileCredentialRepository.shared, legacyStore: UserDefaults = .standard) {
         self.credentials = credentials
         self.legacyStore = legacyStore
     }

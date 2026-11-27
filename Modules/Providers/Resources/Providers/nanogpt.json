@@ -15,7 +15,8 @@
   "order": 145,
   "settings": [
     { "id": "apiKey", "label": "API key", "kind": "secret", "scope": "account" },
-    { "id": "authEnvVar", "label": "Environment variable", "default": "NANOGPT_API_KEY" }
+    { "id": "authEnvVar", "label": "Environment variable", "default": "NANOGPT_API_KEY" },
+    { "id": "keyFile", "label": "Key file (JSON with the key at $.api_key)", "default": "~/.config/claudebar/nanogpt.json" }
   ],
   "defaultDataSource": "api",
   "dataSources": [
@@ -23,7 +24,11 @@
       "kind": "api",
       "label": "API",
       "summary": "Reads the subscription's input-token and image quotas and the account balance.",
-      "credential": { "firstOf": [ { "environment": "{{setting.authEnvVar}}" }, { "setting": "apiKey" } ] },
+      "credential": { "firstOf": [
+        { "environment": "{{setting.authEnvVar}}" },
+        { "jsonFile": { "path": "{{setting.keyFile}}", "token": "$.api_key" } },
+        { "setting": "apiKey" }
+      ] },
       "fetch": {
         "http": {
           "steps": [
