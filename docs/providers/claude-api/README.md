@@ -20,7 +20,9 @@ Anthropic has no endpoint for the credit balance, so what is left is worked out 
 
 ## Multiple accounts
 
-**Add Account** takes another organization's Admin key; each added account uses only its own key.
+**Add Account** takes another organization's Admin key, with that plan's own renewal day and monthly credit; each added account uses only its own key and values. The default account keeps the ones set on the provider. A blank renewal day means the 1st, a blank credit $200.
+
+The `ANTHROPIC_ADMIN_KEY` environment variable comes before a pasted key for every account, so leave it unset when you track several organizations.
 
 ## Gotchas
 

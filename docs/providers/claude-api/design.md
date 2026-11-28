@@ -24,7 +24,7 @@ No endpoint returns the credit balance or the grant. The included credit is spen
 
 - Buckets are UTC days, the cycle is local: a day either side of the renewal can be counted in the wrong cycle.
 - `has_more` is not followed: 1000 rows cover 31 days of every product and model in practice.
-- The renewal day is a setting: nothing in the API says when the plan renews.
+- The renewal day is a setting: nothing in the API says when the plan renews. It and `monthlyCredit` are account-scope, since each organization belongs to its own plan; the default account reads the provider-scope values.
 
 ## Sources
 

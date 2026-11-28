@@ -123,6 +123,24 @@ struct ClaudeAPICreditsDefinitionTests {
     }
 
     @Test
+    func `should give each added account its own key, renewal day and credit`() async throws {
+        let seen = Seen()
+        let credits = try make(environment: [:], values: ["billingDay": "14"],
+                               vault: MemoryVault(["claude-api.apiKey": "sk-ant-admin-plain"]), seen: seen)
+        let other = try credits.accounts.add(filling: ["apiKey": "sk-ant-admin-other", "billingDay": "31", "monthlyCredit": "100"])
+
+        let theirs = try await credits.refresh(other)
+        #expect(seen.last?.value(forHTTPHeaderField: "x-api-key") == "sk-ant-admin-other")
+        #expect(theirs.costUsage?.resetText == "Since 2026-10-31")
+        #expect(theirs.quotas.first?.left == .money(Money(Decimal(string: "27.155")!, currency: "USD"), of: Money(100, currency: "USD")))
+
+        let mine = try await credits.refreshPlain()
+        #expect(seen.last?.value(forHTTPHeaderField: "x-api-key") == "sk-ant-admin-plain")
+        #expect(mine.costUsage?.resetText == "Since 2026-11-14")
+        #expect(mine.quotas.first?.left == .money(Money(Decimal(string: "177.155")!, currency: "USD"), of: Money(200, currency: "USD")))
+    }
+
+    @Test
     func `should use a pasted Admin key when there is no environment key`() async throws {
         let seen = Seen()
         _ = try await make(environment: [:], vault: MemoryVault(["claude-api.apiKey": "sk-ant-admin-pasted"]), seen: seen).refreshPlain()
