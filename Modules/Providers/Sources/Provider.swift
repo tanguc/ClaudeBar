@@ -304,7 +304,7 @@ public final class Provider {
         var kind: String? = configuration.activeKind
         var seen: Set<String> = []
         while let current = kind, seen.insert(current).inserted {
-            if let source = dataSource(current, for: account) { return source }
+            if let source = dataSource(current, for: account), !source.definition.companion { return source }
             kind = definition.dataSource(current)?.fallback?.to
         }
         return nil
@@ -320,7 +320,7 @@ public final class Provider {
         var refused = false
         while true {
             do {
-                let usage = try await current.fetchUsage()
+                let usage = await addingCompanions(to: try await current.fetchUsage(), for: account)
                 // Paused as this fetch landed: the login keeps its numbers and
                 // the refresh is refused. Leaving the loop rather than the
                 // `catch` below — a refusal is not a failed fetch, so it hands
@@ -374,7 +374,7 @@ public final class Provider {
     private func runTogether(_ account: Account) async throws -> UsageSnapshot {
         account.isSyncing = true
         defer { account.isSyncing = false }
-        let sources = dataSources(for: account)
+        let sources = dataSources(for: account).filter { !$0.definition.companion }
         let results = await withTaskGroup(of: (Int, Result<UsageSnapshot, Error>).self) { group in
             for (index, source) in sources.enumerated() {
                 group.addTask {
@@ -403,7 +403,8 @@ public final class Provider {
             extensionMetrics: metrics.isEmpty ? nil : metrics
         )
         let kind = sources.indices.first { if case .success = results[$0] { return true } else { return false } }.map { sources[$0].kind }
-        guard let usage = account.succeed(identified(union, for: account), from: kind ?? definition.defaultDataSource) else {
+        let completed = await addingCompanions(to: union, for: account)
+        guard let usage = account.succeed(identified(completed, for: account), from: kind ?? definition.defaultDataSource) else {
             throw UsageError.paused
         }
         let failed = results.lazy.compactMap { result -> Error? in
@@ -411,6 +412,36 @@ public final class Provider {
         }.first
         if let failed { account.noteFailure(failed) }
         return usage
+    }
+
+    /// The usage with what the login's companions add: each companion that
+    /// finds a key for this login runs beside the answer, and its quotas come
+    /// after the answer's own. One that fails is logged and left out, so the
+    /// login's own usage and health stay as the answer left them.
+    private func addingCompanions(to usage: UsageSnapshot, for account: Account) async -> UsageSnapshot {
+        let companions = dataSources(for: account).filter { $0.definition.companion && $0.hasKey }
+        guard !companions.isEmpty else { return usage }
+        let login = account.id
+        let added = await withTaskGroup(of: (Int, [UsageQuota]).self) { group in
+            for (index, source) in companions.enumerated() {
+                group.addTask {
+                    do { return (index, try await source.fetchUsage().quotas) } catch {
+                        AppLog.probes.warning("\(login) \(source.kind) failed: \(error.localizedDescription)")
+                        return (index, [])
+                    }
+                }
+            }
+            var added: [(Int, [UsageQuota])] = []
+            for await result in group { added.append(result) }
+            return added.sorted { $0.0 < $1.0 }.flatMap(\.1)
+        }
+        guard !added.isEmpty else { return usage }
+        return UsageSnapshot(
+            providerId: usage.providerId, quotas: usage.quotas + added, capturedAt: usage.capturedAt,
+            accountEmail: usage.accountEmail, accountOrganization: usage.accountOrganization,
+            loginMethod: usage.loginMethod, accountTier: usage.accountTier, costUsage: usage.costUsage,
+            dailyUsageReport: usage.dailyUsageReport, extensionMetrics: usage.extensionMetrics
+        )
     }
 
     /// An added login is checked by being added; the default login once an

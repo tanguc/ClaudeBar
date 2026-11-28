@@ -363,6 +363,34 @@
         "to": "cli",
         "enabledBySetting": "cliFallbackEnabled"
       }
+    },
+    {
+      "kind": "apiCredits",
+      "label": "API credits",
+      "summary": "The monthly API credit of the plan's Console organization, from its Admin API key, shown beside the plan's limits",
+      "companion": true,
+      "credential": { "setting": "adminKey" },
+      "fetch": {
+        "http": {
+          "url": "https://api.anthropic.com/v1/organizations/analytics/cost?starting_at={{system.day-30.iso8601}}&ending_at={{system.day+1.iso8601}}&time_bucket_width=1d&group_by%5B%5D=product&group_by%5B%5D=model&limit=1000",
+          "headers": { "x-api-key": "{{token}}", "anthropic-version": "2023-06-01", "anthropic-beta": "analytics-usage-cost-2026-08-24", "Accept": "application/json" },
+          "timeout": 20
+        }
+      },
+      "cache": { "ttl": 600 },
+      "mapping": {
+        "script": {
+          "file": "claude-api-credits.js",
+          "values": {
+            "billingDay": "{{setting.billingDay}}",
+            "monthlyCredit": "{{setting.monthlyCredit}}"
+          }
+        }
+      },
+      "errors": {
+        "http.401": { "sessionExpired": "Use an Admin API key (sk-ant-admin...); a normal API key can't read spend." },
+        "http.403": { "sessionExpired": "Use an Admin API key (sk-ant-admin...); a normal API key can't read spend." }
+      }
     }
   ],
   "setup": {
@@ -429,5 +457,24 @@
         ]
       }
     }
-  }
+  },
+  "settings": [
+    { "id": "adminKey", "label": "Admin API key (API credits)", "kind": "secret", "scope": "account", "for": ["apiCredits"] },
+    {
+      "id": "billingDay",
+      "label": "Plan renewal day (1-31)",
+      "default": "1",
+      "scope": "account",
+      "for": ["apiCredits"],
+      "kind": { "text": { "pattern": "^([1-9]|[12][0-9]|3[01])$" } }
+    },
+    {
+      "id": "monthlyCredit",
+      "label": "Monthly API credit (USD)",
+      "default": "200",
+      "scope": "account",
+      "for": ["apiCredits"],
+      "kind": { "text": { "pattern": "^[0-9]+(\\.[0-9]+)?$" } }
+    }
+  ]
 }

@@ -286,7 +286,11 @@ public struct ProviderDefinition: Sendable, Equatable, Codable {
         let form = accounts?.form ?? []
         let all = settings + form.filter { field in !settings.contains { $0.id == field.id } }
         self.settings = all
-        let accountScope = all.filter { $0.scope == .account }
+        // A companion's settings are a login's own, but never a way to add one.
+        let companions = Set(dataSources.filter(\.companion).map(\.kind))
+        let accountScope = all.filter {
+            $0.scope == .account && ($0.dataSources.isEmpty || !Set($0.dataSources).isSubset(of: companions))
+        }
         if let accounts {
             self.accounts = Accounts(folder: accounts.folder, signIn: accounts.signIn, cli: accounts.cli, form: accountScope)
         } else {

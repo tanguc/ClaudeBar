@@ -57,7 +57,7 @@ public final class Configuration {
 
     /// The data source in use: the one the person picked, else the default.
     public var activeKind: String {
-        if let chosen = settings.dataSourceKind(forProvider: id), definition.dataSource(chosen) != nil {
+        if let chosen = settings.dataSourceKind(forProvider: id), let picked = definition.dataSource(chosen), !picked.companion {
             return chosen
         }
         return definition.defaultDataSource
@@ -66,7 +66,7 @@ public final class Configuration {
     /// Switches the data source. `false` when the provider has no such one.
     @discardableResult
     public func use(_ kind: String) -> Bool {
-        guard definition.dataSource(kind) != nil else { return false }
+        guard let picked = definition.dataSource(kind), !picked.companion else { return false }
         settings.setDataSourceKind(kind, forProvider: id)
         return true
     }

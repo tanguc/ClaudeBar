@@ -14,6 +14,11 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
     public let note: String?
     /// A data source only ever reached as another one's fallback.
     public let hidden: Bool
+    /// Runs beside whichever data source answers a refresh, and adds its
+    /// quotas to that usage — another product's figures on the same login,
+    /// like a plan's API credit. Never the answer itself, never a fallback,
+    /// and its failure leaves the login's usage as it was.
+    public let companion: Bool
     public let credential: CredentialLookup?
     public let fetch: Fetch
     public let mapping: Mapping
@@ -52,6 +57,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         summary: String? = nil,
         note: String? = nil,
         hidden: Bool = false,
+        companion: Bool = false,
         credential: CredentialLookup? = nil,
         fetch: Fetch,
         mapping: Mapping,
@@ -71,6 +77,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         self.summary = summary
         self.note = note
         self.hidden = hidden
+        self.companion = companion
         self.credential = credential
         self.fetch = fetch
         self.mapping = mapping
@@ -92,7 +99,9 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         label = try container.decodeIfPresent(String.self, forKey: .label)
         summary = try container.decodeIfPresent(String.self, forKey: .summary)
         note = try container.decodeIfPresent(String.self, forKey: .note)
-        hidden = try container.decodeIfPresent(Bool.self, forKey: .hidden) ?? false
+        companion = try container.decodeIfPresent(Bool.self, forKey: .companion) ?? false
+        // a companion is never picked: it only runs beside the one that is
+        hidden = try container.decodeIfPresent(Bool.self, forKey: .hidden) ?? companion
         credential = try container.decodeIfPresent(CredentialLookup.self, forKey: .credential)
         fetch = try container.decode(Fetch.self, forKey: .fetch)
         mapping = try container.decode(Mapping.self, forKey: .mapping)
@@ -134,7 +143,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
                           requiresFiles: requiresFiles, identity: identity)
         change(&parts)
         return DataSourceDefinition(
-            kind: kind, label: label, summary: summary, note: note, hidden: hidden,
+            kind: kind, label: label, summary: summary, note: note, hidden: hidden, companion: companion,
             credential: parts.credential, fetch: parts.fetch, mapping: mapping,
             fallback: fallback, fallbackOn: fallbackOn, cache: cache,
             context: parts.context, recover: parts.recover, requiresFiles: parts.requiresFiles,
@@ -151,6 +160,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
         try container.encodeIfPresent(summary, forKey: .summary)
         try container.encodeIfPresent(note, forKey: .note)
         try container.encode(hidden, forKey: .hidden)
+        if companion { try container.encode(companion, forKey: .companion) }
         try container.encodeIfPresent(credential, forKey: .credential)
         try container.encode(fetch, forKey: .fetch)
         try container.encode(mapping, forKey: .mapping)
@@ -169,7 +179,7 @@ public struct DataSourceDefinition: Sendable, Equatable, Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, label, summary, note, hidden, credential, fetch, mapping, fallback, fallbackOn, cache, context,
+        case kind, label, summary, note, hidden, companion, credential, fetch, mapping, fallback, fallbackOn, cache, context,
              recover, requiresFiles, identity, verifyBeforeBackground, unverifiedMessage, errors
     }
 }

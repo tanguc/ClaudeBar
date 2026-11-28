@@ -21,6 +21,8 @@ An extension is a definition of origin *Extension*, run by the same `Provider` a
 
 With `together`, every section runs on each refresh; the usage is their union in the manifest's order, a failed one is left out and shows as fetch health, and the refresh fails only when all do.
 
+A data source with `"companion": true` is never picked and never a fallback: it runs beside whichever data source answers a login's refresh, once it finds a key for that login, and its quotas come after the answer's own. Its failure is logged and leaves the login's usage and health as they were. Claude's `apiCredits` is one: a plan's API credit on the login it belongs to.
+
 ## Why some sections are no longer read
 
 - `dailyUsage` printed ready-made totals; usage history reads raw records. An extension that wants daily usage writes JSON-lines records a `usageHistory` `files` glob reads, as every provider does.

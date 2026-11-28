@@ -21,6 +21,12 @@ Shows your Claude Code 5-hour session and weekly limits, any model-specific week
 
 Each mode falls back to the other when it fails. In API mode, **CLI fallback** (on by default) controls whether `claude /usage` runs when the API can't answer; turn it off if running the CLI causes prompts (e.g. SSH key prompts) and you'd rather see the error. A rate-limit error never triggers the fallback, because the CLI hits the same backend.
 
+## API credits
+
+A Max, Ultra or Team plan pays a monthly API credit into the Claude Console organization it's linked to. Give a login that organization's **Admin API key** (`sk-ant-admin...`) and its page gets an **API credits** card next to its limits: what's left of the credit this cycle, from the organization's spend on the products the credit covers. Claude Code spend on that organization's API keys isn't covered and shows in the card's text as paid from the balance. How the figure is worked out: [Claude API credits](../claude-api/README.md).
+
+Each login has its own key, **plan renewal day** (default the 1st) and **monthly credit** (default $200): the default login uses the provider's own values, an added login keeps its own. The key lives in ClaudeBar's credentials file like every other key, never in its settings. A login without a key shows no card, and a failed read leaves the rest of its page as it was. The card is refreshed with the login, at most every 10 minutes.
+
 ## CLI location
 
 If ClaudeBar can't find the `claude` program, or finds a different one than you use, set **Settings → Providers → Claude → Configuration → CLI location**. Use **Choose…** to pick the program, or type its full path and press Return. The change takes effect immediately, for every account and for Add Account's sign-in. **Reset** goes back to finding `claude` on its own.
