@@ -4,9 +4,11 @@ description: Track the monthly Claude API credit included with a Max, Ultra or T
 
 # Claude API credits
 
-Max, Ultra and Team plans include a monthly credit for the Claude API ($100 on Max, $200 on Ultra, up to $500 pooled on Team), paid into the Claude Console organization linked to the plan. This card shows how much of it is left: the organization's spend since the plan last renewed, taken off the credit, with a line per model.
+Max, Ultra and Team plans include a monthly credit for the Claude API ($100 on Max, $200 on Ultra, up to $500 pooled on Team), paid into the Claude Console organization linked to the plan. This card shows how much of it is left: the organization's spend since the plan last renewed on the products the credit covers, taken off the credit. The cost under it shows every product's spend, with a line per model.
 
 Anthropic has no endpoint for the credit balance, so what is left is worked out from the spend. Purchased credits are spent after the included ones, so the figure holds until the included credit runs out.
+
+**Claude Code isn't covered.** Claude Code requests made with an API key from the linked organization are paid from the purchased balance, not the credit. The card marks those lines `· Claude Code` and keeps them off the credit.
 
 ## Setup
 
@@ -24,7 +26,7 @@ Anthropic has no endpoint for the credit balance, so what is left is worked out 
 
 - **"Use an Admin API key (sk-ant-admin...); a normal API key can't read spend."** Anthropic answered 401 or 403: the key isn't an Admin key, or was revoked.
 - **The cycle is counted in whole UTC days** from the renewal day, so spend on the day of a renewal can land in the wrong cycle. Credits arrive shortly after the plan payment, not at midnight.
-- **Spend shows up within about 5 minutes** of a request. Priority Tier usage isn't in the cost report.
+- **Spend shows up within a few minutes** of a request.
 - **Claude Code on a subscription isn't here.** The credit doesn't cover Claude Code; the Claude card shows plan limits.
 
 ## See also

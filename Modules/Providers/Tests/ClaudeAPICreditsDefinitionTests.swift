@@ -10,27 +10,23 @@ import FoundationNetworking
 
 /// Claude API credits as data: the monthly credit of a Max/Ultra/Team plan,
 /// against the organization's spend since the plan renewed, from the Admin
-/// API's cost report, read by `claude-api-credits.js`.
+/// API's cost analytics by product, read by `claude-api-credits.js`.
 @MainActor @Suite
 struct ClaudeAPICreditsDefinitionTests {
-    /// 2026-11-28 12:00:00 UTC; 30 days before its midnight is 2026-10-29.
+    /// 2026-11-28 12:00:00 UTC; 30 days before its midnight is 2026-10-29, the next midnight 2026-11-29.
     private nonisolated static let now = Date(timeIntervalSince1970: 1_795_867_200)
-    private static let costURL = "https://api.anthropic.com/v1/organizations/cost_report?starting_at=2026-10-29T00:00:00Z&bucket_width=1d&limit=31&group_by%5B%5D=description"
+    private static let costURL = "https://api.anthropic.com/v1/organizations/analytics/cost?starting_at=2026-10-29T00:00:00Z&ending_at=2026-11-29T00:00:00Z&time_bucket_width=1d&group_by%5B%5D=product&group_by%5B%5D=model&limit=1000"
 
-    /// amounts are cents: 50 + 1234.5 + 300 + 1000 + 50 from the 14th, 5000 before it
+    /// amounts are cents: covered 1234.5 + 1000 + 50 from the 14th, Claude Code 300, 5000 before it
     static let report = #"""
     {"data":[
-     {"starting_at":"2026-11-13T00:00:00Z","ending_at":"2026-11-14T00:00:00Z","results":[
-      {"amount":"5000","currency":"USD","cost_type":"tokens","model":"claude-opus-5-5","description":"Claude Opus 5.5 Usage - Output Tokens"}]},
-     {"starting_at":"2026-11-14T00:00:00Z","ending_at":"2026-11-15T00:00:00Z","results":[
-      {"amount":"1234.5","currency":"USD","cost_type":"tokens","model":"claude-opus-5-5","description":"Claude Opus 5.5 Usage - Input Tokens"},
-      {"amount":"300","currency":"USD","cost_type":"tokens","model":"claude-sonnet-5-5","description":"Claude Sonnet 5.5 Usage - Input Tokens"}]},
-     {"starting_at":"2026-11-20T00:00:00Z","ending_at":"2026-11-21T00:00:00Z","results":[
-      {"amount":"1000","currency":"USD","cost_type":"tokens","model":"claude-opus-5-5","description":"Claude Opus 5.5 Usage - Output Tokens"},
-      {"amount":"50","currency":"USD","cost_type":"web_search","model":null,"description":"Web Search Usage"},
-      {"amount":null,"currency":"USD","cost_type":null,"model":null,"description":null}]},
-     {"starting_at":"2026-11-28T00:00:00Z","ending_at":"2026-11-29T00:00:00Z","results":[]}],
-     "has_more":false,"next_page":null}
+     {"starting_at":"2026-11-20T00:00:00Z","ending_at":"2026-11-21T00:00:00Z","group":{"product":"messages_api","model":"claude-opus-5-5"},"cost":{"amount":"1000.000000","list_amount":"1000.000000","currency":"USD","requests":4}},
+     {"starting_at":"2026-11-20T00:00:00Z","ending_at":"2026-11-21T00:00:00Z","group":{"product":"messages_api","model":null},"cost":{"amount":"50.000000","list_amount":"50.000000","currency":"USD","requests":null}},
+     {"starting_at":"2026-11-20T00:00:00Z","ending_at":"2026-11-21T00:00:00Z","group":{"product":null,"model":null},"cost":{"amount":null,"currency":"USD"}},
+     {"starting_at":"2026-11-14T00:00:00Z","ending_at":"2026-11-15T00:00:00Z","group":{"product":"messages_api","model":"claude-opus-5-5"},"cost":{"amount":"1234.500000","list_amount":"1234.500000","currency":"USD","requests":9}},
+     {"starting_at":"2026-11-14T00:00:00Z","ending_at":"2026-11-15T00:00:00Z","group":{"product":"claude_code","model":"claude-sonnet-5-5"},"cost":{"amount":"300.000000","list_amount":"300.000000","currency":"USD","requests":3}},
+     {"starting_at":"2026-11-13T00:00:00Z","ending_at":"2026-11-14T00:00:00Z","group":{"product":"messages_api","model":"claude-opus-5-5"},"cost":{"amount":"5000.000000","list_amount":"5000.000000","currency":"USD","requests":20}}],
+     "has_more":false,"next_page":null,"data_refreshed_at":"2026-11-28T11:55:00Z"}
     """#
 
     final class Seen: @unchecked Sendable {
@@ -75,26 +71,32 @@ struct ClaudeAPICreditsDefinitionTests {
     }
 
     @Test
-    func `should ask the cost report for the last 30 days, with the Admin key`() async throws {
+    func `should ask the cost by product and model for the last 30 days, with the Admin key`() async throws {
         let seen = Seen()
         _ = try await make(seen: seen).refreshPlain()
         #expect(seen.last?.url?.absoluteString == Self.costURL)
         #expect(seen.last?.value(forHTTPHeaderField: "x-api-key") == "sk-ant-admin-test")
         #expect(seen.last?.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01")
+        #expect(seen.last?.value(forHTTPHeaderField: "anthropic-beta") == "analytics-usage-cost-2026-08-24")
     }
 
     @Test
-    func `should count only the spend since the plan renewed, against the monthly credit`() async throws {
+    func `should take only covered spend since the plan renewed off the credit`() async throws {
         let usage = try await make(values: ["billingDay": "14"]).refreshPlain()
         let quota = try #require(usage.quotas.first)
-        #expect(quota.left == .money(Money(Decimal(string: "174.155")!, currency: "USD"), of: Money(200, currency: "USD")))
-        #expect(quota.resetText == "Spent $25.85 of $200.00")
+        #expect(quota.left == .money(Money(Decimal(string: "177.155")!, currency: "USD"), of: Money(200, currency: "USD")))
+        #expect(quota.resetText == "Covered spend $22.85 of $200.00 · Claude Code $3.00 from balance")
         #expect(quota.resetsAt == localMidnight(2026, 12, 14))
+    }
+
+    @Test
+    func `should show every product's spend since the plan renewed, Claude Code marked`() async throws {
+        let usage = try await make(values: ["billingDay": "14"]).refreshPlain()
         let cost = try #require(usage.costUsage)
         #expect(cost.totalCost == Decimal(string: "25.845"))
-        #expect(cost.budget == 200)
+        #expect(cost.budget == nil)
         #expect(cost.resetText == "Since 2026-11-14")
-        #expect(cost.lines.map(\.label) == ["claude-opus-5-5", "claude-sonnet-5-5", "Web search"])
+        #expect(cost.lines.map(\.label) == ["claude-opus-5-5", "claude-sonnet-5-5 · Claude Code", "Other"])
         #expect(cost.lines.map(\.amount) == [Decimal(string: "22.345"), 3, Decimal(string: "0.5")])
     }
 
@@ -102,6 +104,7 @@ struct ClaudeAPICreditsDefinitionTests {
     func `should start the cycle on the 1st when no renewal day is set`() async throws {
         let usage = try await make().refreshPlain()
         #expect(usage.costUsage?.totalCost == Decimal(string: "75.845"))
+        #expect(usage.quotas.first?.left == .money(Money(Decimal(string: "127.155")!, currency: "USD"), of: Money(200, currency: "USD")))
         #expect(usage.costUsage?.resetText == "Since 2026-11-01")
         #expect(usage.quotas.first?.resetsAt == localMidnight(2026, 12, 1))
     }
@@ -117,7 +120,6 @@ struct ClaudeAPICreditsDefinitionTests {
     func `should use the credit the person set and show nothing left once it is spent`() async throws {
         let usage = try await make(values: ["monthlyCredit": "50"]).refreshPlain()
         #expect(usage.quotas.first?.left == .money(Money(0, currency: "USD"), of: Money(50, currency: "USD")))
-        #expect(usage.costUsage?.budget == 50)
     }
 
     @Test

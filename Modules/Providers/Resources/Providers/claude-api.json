@@ -34,12 +34,12 @@
     {
       "kind": "api",
       "label": "Admin API",
-      "summary": "Reads the organization's spend since the plan renewed, against the monthly credit, with an Admin API key",
+      "summary": "Reads the organization's spend since the plan renewed by product, against the monthly credit, with an Admin API key",
       "credential": { "firstOf": [ { "environment": "ANTHROPIC_ADMIN_KEY" }, { "setting": "apiKey" } ] },
       "fetch": {
         "http": {
-          "url": "https://api.anthropic.com/v1/organizations/cost_report?starting_at={{system.day-30.iso8601}}&bucket_width=1d&limit=31&group_by%5B%5D=description",
-          "headers": { "x-api-key": "{{token}}", "anthropic-version": "2023-06-01", "Accept": "application/json" },
+          "url": "https://api.anthropic.com/v1/organizations/analytics/cost?starting_at={{system.day-30.iso8601}}&ending_at={{system.day+1.iso8601}}&time_bucket_width=1d&group_by%5B%5D=product&group_by%5B%5D=model&limit=1000",
+          "headers": { "x-api-key": "{{token}}", "anthropic-version": "2023-06-01", "anthropic-beta": "analytics-usage-cost-2026-08-24", "Accept": "application/json" },
           "timeout": 20
         }
       },
