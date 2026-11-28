@@ -58,6 +58,7 @@ Or download the signed and notarized DMG from [Releases](https://github.com/tddw
 | Windsurf | Daily and weekly quota, or message and flow-action allowances | [docs](docs/providers/windsurf/README.md) |
 | JetBrains AI | Monthly AI credits from your IDE | [docs](docs/providers/jetbrains/README.md) |
 | OpenAI API | Organization spend over the last 30 days, per line item | [docs](docs/providers/openai/README.md) |
+| Claude API credits | The monthly API credit of a Max/Ultra/Team plan: spend since renewal against the credit | [docs](docs/providers/claude-api/README.md) |
 | Cloudflare AI | Workers AI neurons against 10k a day, Workers AI and AI Gateway tokens, the Workers Paid overage and the last invoice | [docs](docs/providers/cloudflare-ai/README.md) |
 | Runcrate | Credit balance in dollars | [docs](docs/providers/runcrate/README.md) |
 | UberLLM | Prepaid balance in dollars, less what running requests hold | [docs](docs/providers/uberllm/README.md) |

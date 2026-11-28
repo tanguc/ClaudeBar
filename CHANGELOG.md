@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Claude API credits**: a card for the monthly API credit included with Max, Ultra and Team plans, showing what is left this cycle from the Admin API's cost report, with a line per model. → [docs](https://github.com/tanguc/ClaudeBar/blob/main/docs/providers/claude-api/README.md)
+
 ---
 
 ## [0.5.28] - 2026-11-17

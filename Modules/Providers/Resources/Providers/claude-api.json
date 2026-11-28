@@ -1,0 +1,61 @@
+{
+  "profile": {
+    "id": "claude-api",
+    "name": "Claude API credits",
+    "links": {
+      "dashboard": "https://platform.claude.com/settings/billing",
+      "status": "https://status.claude.com"
+    },
+    "look": {
+      "symbol": "creditcard.fill",
+      "color": { "light": [0.85, 0.47, 0.34], "dark": [0.93, 0.58, 0.45] },
+      "gradientEnd": { "light": [0.68, 0.33, 0.22], "dark": [0.8, 0.44, 0.32] }
+    }
+  },
+  "enabledByDefault": false,
+  "order": 275,
+  "settings": [
+    { "id": "apiKey", "label": "Admin API key", "kind": "secret", "scope": "account" },
+    {
+      "id": "billingDay",
+      "label": "Plan renewal day (1-31)",
+      "default": "1",
+      "kind": { "text": { "pattern": "^([1-9]|[12][0-9]|3[01])$" } }
+    },
+    {
+      "id": "monthlyCredit",
+      "label": "Monthly credit (USD)",
+      "default": "200",
+      "kind": { "text": { "pattern": "^[0-9]+(\\.[0-9]+)?$" } }
+    }
+  ],
+  "defaultDataSource": "api",
+  "dataSources": [
+    {
+      "kind": "api",
+      "label": "Admin API",
+      "summary": "Reads the organization's spend since the plan renewed, against the monthly credit, with an Admin API key",
+      "credential": { "firstOf": [ { "environment": "ANTHROPIC_ADMIN_KEY" }, { "setting": "apiKey" } ] },
+      "fetch": {
+        "http": {
+          "url": "https://api.anthropic.com/v1/organizations/cost_report?starting_at={{system.day-30.iso8601}}&bucket_width=1d&limit=31&group_by%5B%5D=description",
+          "headers": { "x-api-key": "{{token}}", "anthropic-version": "2023-06-01", "Accept": "application/json" },
+          "timeout": 20
+        }
+      },
+      "mapping": {
+        "script": {
+          "file": "claude-api-credits.js",
+          "values": {
+            "billingDay": "{{setting.billingDay}}",
+            "monthlyCredit": "{{setting.monthlyCredit}}"
+          }
+        }
+      },
+      "errors": {
+        "http.401": { "sessionExpired": "Use an Admin API key (sk-ant-admin...); a normal API key can't read spend." },
+        "http.403": { "sessionExpired": "Use an Admin API key (sk-ant-admin...); a normal API key can't read spend." }
+      }
+    }
+  ]
+}
