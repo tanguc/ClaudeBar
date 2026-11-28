@@ -26,6 +26,10 @@ No endpoint returns the credit balance or the grant. The included credit is spen
 - `has_more` is not followed: 1000 rows cover 31 days of every product and model in practice.
 - The renewal day is a setting: nothing in the API says when the plan renews. It and `monthlyCredit` are account-scope, since each organization belongs to its own plan; the default account reads the provider-scope values.
 
+## The Console's own balance
+
+The Console's Billing page reads the real figure from an undocumented endpoint, `GET https://platform.claude.com/api/organizations/{organization_uuid}/prepaid/credits` (checked 2026-11-28). Its `promo_tranches[]` entry with `program_id: "subscription_api_credit"` (`name`: "API credit (Ultra)") carries `remaining_amount_minor_units`, `granted_amount_minor_units` (cents), `granted_at` and `expires_at`; `tranches[]` holds purchased credits. It answers only to the Console's browser session: an Admin API key gets `403 Invalid authorization`, and `api.anthropic.com` has no such path. The card keeps the documented cost report, so it needs no session.
+
 ## Sources
 
 - [API credits for Max, Ultra, and Team plans](https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers)
